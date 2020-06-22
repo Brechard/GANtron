@@ -334,7 +334,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                 g_optimizer.step()
                 if not is_overflow and rank == 0:
                     duration = time.perf_counter() - start
-                    print(f"{iteration} Generator loss {round_(total_loss, 6)} "
+                    print(f"{iteration} Generator loss {round(reduced_loss, 6)} "
                           f"Adv loss {round_(adv_loss, 6)} Taco loss {round_(taco_loss, 6)} "
                           f"Grad Norm {round_(grad_norm, 6)} {duration:.2f}s/it")
 
