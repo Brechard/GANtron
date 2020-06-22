@@ -1,5 +1,6 @@
 import random
 
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
@@ -11,9 +12,11 @@ class Tacotron2Logger(SummaryWriter):
     def __init__(self, logdir):
         super(Tacotron2Logger, self).__init__(logdir)
 
-    def log_generator_training(self, total_loss, adv_loss, taco_loss, grad_norm, learning_rate, duration, iteration):
+    def log_generator_training(self, total_loss, adv_loss, mel_loss, gate_loss, grad_norm, learning_rate, duration,
+                               iteration):
         self.add_scalar("Generator loss", total_loss, iteration)
-        self.add_scalar("Tacotron loss", taco_loss, iteration)
+        self.add_scalar("Mel loss", mel_loss, iteration)
+        self.add_scalar("Gate loss", gate_loss, iteration)
         self.add_scalar("Adversarial loss", adv_loss, iteration)
         self.add_scalar("Grad norm", grad_norm, iteration)
         self.add_scalar("Generator learning rate", learning_rate, iteration)
@@ -26,8 +29,9 @@ class Tacotron2Logger(SummaryWriter):
         self.add_scalar("Discriminator learning rate", learning_rate, iteration)
         self.add_scalar("Discriminator duration", duration, iteration)
 
-    def log_validation(self, reduced_loss, model, y, y_pred, iteration):
-        self.add_scalar("validation.loss", reduced_loss, iteration)
+    def log_validation(self, mel_loss, gate_loss, model, y, y_pred, iteration):
+        self.add_scalar("Validation mel loss", mel_loss, iteration)
+        self.add_scalar("Validation gate loss", gate_loss, iteration)
         _, mel_outputs, gate_outputs, alignments = y_pred
         mel_targets, gate_targets = y
 
@@ -37,22 +41,21 @@ class Tacotron2Logger(SummaryWriter):
             self.add_histogram(tag, value.data.cpu().numpy(), iteration)
 
         # plot alignment, mel target and predicted, gate target and predicted
-        idx = random.randint(0, alignments.size(0) - 1)
-        self.add_image(
-            "alignment",
-            plot_alignment_to_numpy(alignments[idx].data.cpu().numpy().T),
-            iteration, dataformats='HWC')
-        self.add_image(
-            "mel_target",
-            plot_spectrogram_to_numpy(mel_targets[idx].data.cpu().numpy()),
-            iteration, dataformats='HWC')
-        self.add_image(
-            "mel_predicted",
-            plot_spectrogram_to_numpy(mel_outputs[idx].data.cpu().numpy()),
-            iteration, dataformats='HWC')
-        self.add_image(
-            "gate",
-            plot_gate_outputs_to_numpy(
-                gate_targets[idx].data.cpu().numpy(),
-                torch.sigmoid(gate_outputs[idx]).data.cpu().numpy()),
-            iteration, dataformats='HWC')
+        times = 3 if alignments.size(0) >= 3 else alignments.size(0)
+        idxs = []
+        alignmentss, mels, predicteds, gates = [], [], [], []
+        for x in range(times):
+            # plot alignment, mel target and predicted, gate target and predicted
+            idx = random.randint(0, alignments.size(0) - 1)
+            while idx in idxs:
+                idx = random.randint(0, alignments.size(0) - 1)
+            idxs.append(idx)
+            alignmentss.append(plot_alignment_to_numpy(alignments[idx].data.cpu().numpy().T))
+            mels.append(plot_spectrogram_to_numpy(mel_outputs[idx].data.cpu().numpy(),
+                                                  mel_targets[idx].data.cpu().numpy()))
+            gates.append(plot_gate_outputs_to_numpy(gate_targets[idx].data.cpu().numpy(),
+                                                    torch.sigmoid(gate_outputs[idx]).data.cpu().numpy()))
+
+        self.add_images("Alignment", np.array(alignmentss), iteration, dataformats='NHWC')
+        self.add_images("Mel spectrogram", np.array(mels), iteration, dataformats='NHWC')
+        self.add_images("Gate", np.array(gates), iteration, dataformats='NHWC')

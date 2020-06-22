@@ -49,7 +49,7 @@ class DiscConv1d(torch.nn.Module):
             padding = int(dilation * (kernel_size - 1) / 2)
         conv = torch.nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride,
                                padding=padding, dilation=dilation, bias=bias)
-        torch.nn.init.xavier_uniform_(conv.weight, gain=torch.nn.init.calculate_gain('linear'))
+        torch.nn.init.xavier_uniform_(conv.weight, gain=torch.nn.init.calculate_gain('tanh'))
         self.module = torch.nn.Sequential(
             conv,
             torch.nn.Dropout(dropout),

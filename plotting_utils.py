@@ -29,14 +29,19 @@ def plot_alignment_to_numpy(alignment, info=None):
     return data
 
 
-def plot_spectrogram_to_numpy(spectrogram):
-    fig, ax = plt.subplots(figsize=(12, 3))
-    im = ax.imshow(spectrogram, aspect="auto", origin="lower",
-                   interpolation='none')
-    plt.colorbar(im, ax=ax)
+def plot_spectrogram_to_numpy(pred_mel, ground_truth):
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    im = ax1.imshow(pred_mel, origin="lower")
+    ax1.set_title('Generated mel spectrogram')
+
+    im = ax2.imshow(ground_truth, origin="lower")
+    ax2.set_title('Ground truth mel spectrogram')
+
+    # Add only one colorbar since they share the y axis
+    fig.colorbar(im, ax=[ax1, ax2])
     plt.xlabel("Frames")
     plt.ylabel("Channels")
-    plt.tight_layout()
+    # plt.tight_layout()
 
     fig.canvas.draw()
     data = save_figure_to_numpy(fig)

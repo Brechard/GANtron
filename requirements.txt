@@ -9,3 +9,4 @@ pillow
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch
 numba==0.48
+wandb

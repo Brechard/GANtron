@@ -5,6 +5,7 @@ import time
 
 import torch
 import torch.distributed as dist
+import wandb
 from numpy import finfo
 from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
@@ -158,13 +159,15 @@ def load_checkpoint(checkpoint_path, model, optimizer):
     return model, optimizer, learning_rate, iteration
 
 
-def save_checkpoint(model, optimizer, learning_rate, iteration, filepath):
+def save_checkpoint(model, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration, filepath):
     print("Saving model and optimizer state at iteration {} to {}".format(
         iteration, filepath))
     torch.save({'iteration': iteration,
                 'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'learning_rate': learning_rate}, filepath)
+                'g_optimizer': g_optimizer.state_dict(),
+                'g_learning_rate': g_learning_rate,
+                'd_optimizer': d_optimizer.state_dict(),
+                'd_learning_rate': d_learning_rate}, filepath)
 
 
 def validate(model, criterion, valset, iteration, batch_size, n_gpus,
@@ -177,22 +180,27 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
                                 shuffle=False, batch_size=batch_size,
                                 pin_memory=False, collate_fn=collate_fn)
 
-        val_loss = 0.0
+        val_mel_loss, val_gate_loss = 0.0, 0.0
         for i, batch in enumerate(val_loader):
             x, y = model.parse_batch(batch)
             y_pred = model(x)
-            loss = criterion(y_pred, y)
+            mel_loss, gate_loss = criterion(y_pred, y)
             if distributed_run:
-                reduced_val_loss = reduce_tensor(loss.data, n_gpus).item()
+                reduced_mel_val_loss = reduce_tensor(mel_loss.data, n_gpus).item()
+                reduced_gate_val_loss = reduce_tensor(gate_loss.data, n_gpus).item()
             else:
-                reduced_val_loss = loss.item()
-            val_loss += reduced_val_loss
-        val_loss = val_loss / (i + 1)
+                reduced_mel_val_loss = mel_loss.item()
+                reduced_gate_val_loss = gate_loss.item()
+            val_mel_loss += reduced_mel_val_loss
+            val_gate_loss += reduced_gate_val_loss
+        val_mel_loss = val_mel_loss / (i + 1)
+        val_gate_loss = val_gate_loss / (i + 1)
 
     model.train()
     if rank == 0:
-        print("Validation loss {}: {:9f}  ".format(iteration, val_loss))
-        logger.log_validation(val_loss, model, y, y_pred, iteration)
+        print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
+        logger.log_validation(val_mel_loss, val_gate_loss, model, y, y_pred, iteration)
+    return val_mel_loss + val_gate_loss
 
 
 def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
@@ -311,7 +319,8 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                 generated_mel = y_pred[1]
                 generated_output_lengths = x[-1]
 
-                taco_loss = criterion(y_pred, y)
+                mel_loss, gate_loss = criterion(y_pred, y)
+                taco_loss = mel_loss + gate_loss
                 adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
                 total_loss = taco_loss + adv_loss
 
@@ -340,8 +349,8 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                           f"Adv loss {round_(adv_loss, 6)} Taco loss {round_(taco_loss, 6)} "
                           f"Grad Norm {round_(grad_norm, 6)} {duration:.2f}s/it")
 
-                    logger.log_generator_training(total_loss, adv_loss, taco_loss, grad_norm, g_learning_rate, duration,
-                                                  iteration)
+                    logger.log_generator_training(total_loss, adv_loss, mel_loss, gate_loss, grad_norm, g_learning_rate,
+                                                  duration, iteration)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
@@ -350,22 +359,23 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
 
             iteration += 1
             if not is_overflow and (iteration % hparams.iters_per_checkpoint == 0):
-                validate(generator, criterion, valset, iteration,
-                         hparams.batch_size, n_gpus, collate_fn, logger,
-                         hparams.distributed_run, rank)
+                val_loss = validate(generator, criterion, valset, iteration,
+                                    hparams.batch_size, n_gpus, collate_fn, logger,
+                                    hparams.distributed_run, rank)
                 if rank == 0:
-                    checkpoint_path = os.path.join(
-                        output_directory, "checkpoint_{}".format(iteration))
-                    save_checkpoint(generator, g_optimizer, g_learning_rate, iteration,
+                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
+                    checkpoint_path = output_directory + name
+                    save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
+                    wandb.save(checkpoint_path)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str,
-                        help='directory to save checkpoints')
+                        required=False, help='directory to save checkpoints')
     parser.add_argument('-l', '--log_directory', type=str,
-                        help='directory to save tensorboard logs')
+                        required=False, help='directory to save tensorboard logs')
     parser.add_argument('-c', '--checkpoint_path', type=str, default=None,
                         required=False, help='checkpoint path')
     parser.add_argument('--warm_start', action='store_true',
@@ -393,5 +403,12 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
+    wandb.init(project="GANtron", sync_tensorboard=True, config=hparams.values())
+    if args.output_directory is None:
+        args.output_directory = wandb.run.dir + '/output'
+    if args.log_directory is None:
+        args.log_directory = wandb.run.dir + '/logs'
+
     train(args.output_directory, args.log_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams)
+# WANDB_MODEdryrun
