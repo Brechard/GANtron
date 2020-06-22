@@ -260,6 +260,8 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
             start = time.perf_counter()
             if disc_times > 0:
                 """ Train Discriminator """
+                for param_group in d_optimizer.param_groups:
+                    param_group['lr'] = d_learning_rate
                 discriminator.zero_grad()
                 x, y = generator.parse_batch(batch)
                 real_mel, output_lengths = x[2], x[-1]
