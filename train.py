@@ -87,10 +87,10 @@ def init_distributed(hparams, n_gpus, rank, group_name):
     print("Done initializing distributed")
 
 
-def prepare_dataloaders(hparams):
+def prepare_dataloaders(hparams, wavs_path):
     # Get data, data loaders and collate function ready
-    trainset = TextMelLoader(hparams.training_files, hparams)
-    valset = TextMelLoader(hparams.validation_files, hparams)
+    trainset = TextMelLoader(hparams.training_files, hparams, wavs_path)
+    valset = TextMelLoader(hparams.validation_files, hparams, wavs_path)
     collate_fn = TextMelCollate(hparams.n_frames_per_step)
 
     if hparams.distributed_run:
@@ -204,7 +204,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
 
 
 def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
-          rank, group_name, hparams):
+          rank, group_name, hparams, wavs_path):
     """Training and validation logging results to tensorboard and stdout
 
     Params
@@ -215,6 +215,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
     n_gpus (int): number of gpus
     rank (int): rank of current gpu
     hparams (object): comma separated list of "name=value" pairs.
+    wavs_path (string): path to the wav files.
     """
     if hparams.distributed_run:
         init_distributed(hparams, n_gpus, rank, group_name)
@@ -241,7 +242,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
 
     logger = prepare_directories_and_logger(output_directory, log_directory, rank)
 
-    train_loader, valset, collate_fn = prepare_dataloaders(hparams)
+    train_loader, valset, collate_fn = prepare_dataloaders(hparams, wavs_path)
 
     # Load checkpoint if one exists
     iteration = 0
@@ -388,6 +389,7 @@ if __name__ == '__main__':
                         required=False, help='Distributed group name')
     parser.add_argument('--hparams', type=str,
                         required=False, help='comma separated name=value pairs')
+    parser.add_argument('--wavs_path', type=str, required=True, help='Path to the wavs files')
 
     args = parser.parse_args()
     hparams = create_hparams(args.hparams)
@@ -410,5 +412,5 @@ if __name__ == '__main__':
         args.log_directory = wandb.run.dir + '/logs'
 
     train(args.output_directory, args.log_directory, args.checkpoint_path,
-          args.warm_start, args.n_gpus, args.rank, args.group_name, hparams)
+          args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)
 # WANDB_MODEdryrun
