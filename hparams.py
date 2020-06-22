@@ -81,6 +81,7 @@ def create_hparams(hparams_string=None, verbose=False):
         d_freq=5,
         clipping_value=0,
         gradient_penalty_lambda=0.1,
+        noise_size=88,
 
         ################################
         # Optimization Hyperparameters #

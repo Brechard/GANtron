@@ -291,6 +291,9 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                       f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} "
                       f"{extra_log}{duration:.2f}s/it")
 
+                logger.log_discriminator_training(reduced_loss, real_loss, fake_loss, d_learning_rate, duration,
+                                                  iteration)
+
                 disc_times += 1
                 if disc_times > hparams.d_freq:
                     disc_times = 0
@@ -335,8 +338,8 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                           f"Adv loss {round_(adv_loss, 6)} Taco loss {round_(taco_loss, 6)} "
                           f"Grad Norm {round_(grad_norm, 6)} {duration:.2f}s/it")
 
-                    logger.log_training(
-                        reduced_loss, grad_norm, g_learning_rate, duration, iteration)
+                    logger.log_generator_training(total_loss, adv_loss, taco_loss, grad_norm, g_learning_rate, duration,
+                                                  iteration)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
