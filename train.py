@@ -117,15 +117,13 @@ def load_checkpoint(checkpoint_path, model, optimizer):
     return model, optimizer, learning_rate, iteration
 
 
-def save_checkpoint(model, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration, filepath):
+def save_checkpoint(model, g_optimizer, g_learning_rate, iteration, filepath):
     print("Saving model and optimizer state at iteration {} to {}".format(
         iteration, filepath))
     torch.save({'iteration': iteration,
                 'state_dict': model.state_dict(),
                 'g_optimizer': g_optimizer.state_dict(),
-                'g_learning_rate': g_learning_rate,
-                'd_optimizer': d_optimizer.state_dict(),
-                'd_learning_rate': d_learning_rate}, filepath)
+                'g_learning_rate': g_learning_rate}, filepath)
 
 
 def validate(model, criterion, valset, iteration, batch_size, n_gpus,
@@ -270,8 +268,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                 if rank == 0:
                     name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
                     checkpoint_path = output_directory + name
-                    save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
-                                    checkpoint_path)
+                    save_checkpoint(generator, g_optimizer, g_learning_rate, iteration, checkpoint_path)
                     wandb.save(checkpoint_path)
 
 
