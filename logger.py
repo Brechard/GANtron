@@ -12,12 +12,11 @@ class Tacotron2Logger(SummaryWriter):
     def __init__(self, logdir):
         super(Tacotron2Logger, self).__init__(logdir)
 
-    def log_generator_training(self, total_loss, adv_loss, mel_loss, gate_loss, grad_norm, learning_rate, duration,
+    def log_generator_training(self, total_loss, mel_loss, gate_loss, grad_norm, learning_rate, duration,
                                iteration):
         self.add_scalar("Generator loss", total_loss, iteration)
         self.add_scalar("Mel loss", mel_loss, iteration)
         self.add_scalar("Gate loss", gate_loss, iteration)
-        self.add_scalar("Adversarial loss", adv_loss, iteration)
         self.add_scalar("Grad norm", grad_norm, iteration)
         self.add_scalar("Generator learning rate", learning_rate, iteration)
         self.add_scalar("Generation duration", duration, iteration)
