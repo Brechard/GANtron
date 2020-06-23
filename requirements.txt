@@ -1,12 +1,10 @@
+# install first pytorch with conda
 matplotlib
-tensorflow==1.15.0
 numpy
 inflect
 librosa
-scipy
 Unidecode
 pillow
---find-links https://download.pytorch.org/whl/torch_stable.html
-torch
 numba==0.48
 wandb
+tensorboard

@@ -14,7 +14,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from data_utils import TextMelLoader, TextMelCollate
 from distributed import apply_gradient_allreduce
-from hparams import create_hparams
+from hparams import HParams
 from logger import Tacotron2Logger
 from loss_function import Tacotron2Loss
 from model import Tacotron2, Discriminator
@@ -392,7 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--wavs_path', type=str, required=True, help='Path to the wavs files')
 
     args = parser.parse_args()
-    hparams = create_hparams(args.hparams)
+    hparams = HParams(args.hparams)
     real = 1
     fake = -1
 
@@ -405,7 +405,7 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    wandb.init(project="GANtron", sync_tensorboard=True, config=hparams.values())
+    wandb.init(project="GANtron", sync_tensorboard=True, config=hparams.__dict__)
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
     if args.log_directory is None:
@@ -413,4 +413,3 @@ if __name__ == '__main__':
 
     train(args.output_directory, args.log_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)
-# WANDB_MODEdryrun
