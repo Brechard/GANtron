@@ -22,6 +22,8 @@ from utils import get_mask_from_lengths
 
 
 def round_(tensor, decimals):
+    if type(tensor) is float:
+        return round(tensor, decimals)
     return str(tensor.cpu().detach().numpy().round(decimals))
 
 
