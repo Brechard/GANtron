@@ -74,7 +74,7 @@ class HParams:
 
         # GAN parameters
         self.discriminator_window = 1
-        self.discriminator_dim = 1024
+        self.discriminator_dim = 512
         self.g_freq = 1
         self.d_freq = 5
         self.clipping_value = 0

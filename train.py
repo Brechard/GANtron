@@ -296,6 +296,12 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                 else:
                     reduced_loss = discriminator_loss.item()
 
+                if hparams.fp16_run:
+                    with amp.scale_loss(discriminator_loss, g_optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    discriminator_loss.backward()
+
                 discriminator_loss.backward()
                 duration = time.perf_counter() - start
                 print(f"{iteration} Discriminator loss {round(reduced_loss, 6)} "
