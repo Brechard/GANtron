@@ -299,7 +299,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                     reduced_loss = discriminator_loss.item()
 
                 if hparams.fp16_run:
-                    with amp.scale_loss(discriminator_loss, g_optimizer) as scaled_loss:
+                    with amp.scale_loss(discriminator_loss, d_optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
                     discriminator_loss.backward()
