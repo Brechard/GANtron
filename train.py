@@ -302,7 +302,6 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                 else:
                     discriminator_loss.backward()
 
-                discriminator_loss.backward()
                 duration = time.perf_counter() - start
                 print(f"{iteration} Discriminator loss {round(reduced_loss, 6)} "
                       f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} "
