@@ -11,11 +11,12 @@ from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+from tqdm import tqdm
 
+import logger
 from data_utils import TextMelLoader, TextMelCollate
 from distributed import apply_gradient_allreduce
 from hparams import HParams
-import logger
 from loss_function import Tacotron2Loss
 from model import Tacotron2, Discriminator
 from utils import get_mask_from_lengths
@@ -137,17 +138,19 @@ def warm_start_model(checkpoint_path, model, ignore_layers):
     return model
 
 
-def load_checkpoint(checkpoint_path, model, optimizer):
+def load_checkpoint(checkpoint_path, model, g_optimizer, d_optimizer):
     assert os.path.isfile(checkpoint_path)
     print("Loading checkpoint '{}'".format(checkpoint_path))
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     model.load_state_dict(checkpoint_dict['state_dict'])
-    optimizer.load_state_dict(checkpoint_dict['optimizer'])
-    learning_rate = checkpoint_dict['learning_rate']
+    g_optimizer.load_state_dict(checkpoint_dict['g_optimizer'])
+    g_learning_rate = checkpoint_dict['g_learning_rate']
+    d_optimizer.load_state_dict(checkpoint_dict['d_optimizer'])
+    d_learning_rate = checkpoint_dict['d_learning_rate']
     iteration = checkpoint_dict['iteration']
     print("Loaded checkpoint '{}' from iteration {}".format(
         checkpoint_path, iteration))
-    return model, optimizer, learning_rate, iteration
+    return model, g_optimizer, d_optimizer, g_learning_rate, d_learning_rate, iteration
 
 
 def save_checkpoint(model, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration, filepath):
@@ -248,10 +251,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
         if warm_start:
             generator = warm_start_model(checkpoint_path, generator, hparams.ignore_layers)
         else:
-            generator, optimizer, _g_learning_rate, iteration = load_checkpoint(
-                checkpoint_path, generator, g_optimizer)
+            generator, g_optimizer, d_optimizer, _g_learning_rate, _d_learning_rate, iteration = load_checkpoint(
+                checkpoint_path, generator, g_optimizer, d_optimizer)
             if hparams.use_saved_learning_rate:
                 g_learning_rate = _g_learning_rate
+                d_learning_rate = _d_learning_rate
             iteration += 1  # next iteration is iteration + 1
             epoch_offset = max(0, int(iteration / len(train_loader)))
 
@@ -260,9 +264,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     is_overflow = False
     gen_times, disc_times = 1, 0
     # ================ MAIN TRAINING LOOP! ===================
-    for epoch in range(epoch_offset, hparams.epochs):
-        print("Epoch: {}".format(epoch))
-        for i, batch in enumerate(train_loader):
+    progress_bar = tqdm(range(epoch_offset, hparams.epochs))
+    for epoch in progress_bar:
+        progress_bar.set_description(f'Epoch {epoch}')
+        progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
+        for i, batch in progress_bar_2:
             start = time.perf_counter()
             if disc_times > 0:
                 """ Train Discriminator """
@@ -301,12 +307,13 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 d_optimizer.step()
 
                 duration = time.perf_counter() - start
-                print(f"{iteration} Discriminator loss {round(reduced_loss, 6)} "
-                      f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} "
-                      f"{extra_log}{duration:.2f}s/it")
+                progress_bar_2.set_description(
+                    f"{iteration} Discriminator loss {round(reduced_loss, 6)} "
+                    f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} {extra_log}"
+                )
 
-                logger.log_values(reduced_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
-                                  discriminator_learning_rate=d_learning_rate, duration=duration, step=iteration)
+                logger.log_values(step=iteration, reduced_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
+                                  discriminator_learning_rate=d_learning_rate, discriminator_duration=duration)
 
                 disc_times += 1
                 if disc_times > hparams.d_freq:
@@ -349,13 +356,13 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 g_optimizer.step()
                 if not is_overflow and rank == 0:
                     duration = time.perf_counter() - start
-                    print(f"{iteration} Generator loss {round(reduced_loss, 6)} "
-                          f"Adv loss {round_(adv_loss, 6)} Taco loss {round_(taco_loss, 6)} "
-                          f"Grad Norm {round_(grad_norm, 6)} {duration:.2f}s/it")
+                    progress_bar_2.set_description(f"{iteration} Generator loss {round(reduced_loss, 6)} "
+                                                   f"Taco loss {round_(taco_loss, 6)} "
+                                                   f"Grad Norm {round_(grad_norm, 6)}")
 
-                    logger.log_values(
-                        total_loss=total_loss, adversarial_loss=adv_loss, mel_loss=mel_loss, gate_loss=gate_loss,
-                        grad_norm=grad_norm, generator_learning_rate=g_learning_rate, duration=duration, step=iteration)
+                    logger.log_values(step=iteration, generator_loss=total_loss, adversarial_loss=adv_loss,
+                                      mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
+                                      generator_learning_rate=g_learning_rate, generator_duration=duration)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
@@ -377,26 +384,21 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output_directory', type=str,
-                        required=False, help='directory to save checkpoints')
-    parser.add_argument('-c', '--checkpoint_path', type=str, default=None,
-                        required=False, help='checkpoint path')
-    parser.add_argument('--warm_start', action='store_true',
-                        help='load model weights only, ignore specified layers')
-    parser.add_argument('--n_gpus', type=int, default=1,
-                        required=False, help='number of gpus')
-    parser.add_argument('--rank', type=int, default=0,
-                        required=False, help='rank of current gpu')
-    parser.add_argument('--group_name', type=str, default='group_name',
-                        required=False, help='Distributed group name')
-    parser.add_argument('--hparams', type=str,
-                        required=False, help='comma separated name=value pairs')
-    parser.add_argument('--wavs_path', type=str, required=True, help='Path to the wavs files')
+    parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
+    parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
+    parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
+    parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
+    parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
+    parser.add_argument('--group_name', type=str, default='group_name', required=False, help='Distributed group name')
+    parser.add_argument('--hparams', type=str, required=False, help='comma separated name=value pairs')
+    parser.add_argument('--wavs_path', type=str, required=True, help='path to the wavs files')
+    parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
+    parser.add_argument('--real', type=int, default=1, required=False, help='value of real mel for Wasserstein loss')
 
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     real = 1
-    fake = -1
+    fake = - real
 
     torch.backends.cudnn.enabled = hparams.cudnn_enabled
     torch.backends.cudnn.benchmark = hparams.cudnn_benchmark
@@ -407,7 +409,11 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    wandb.init(project="GANtron", config=hparams.__dict__)
+    if args.resume != '':
+        wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
+    else:
+        wandb.init(project="GANtron", config=hparams.__dict__)
+    wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 

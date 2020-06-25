@@ -7,3 +7,4 @@ Unidecode
 pillow
 numba==0.48
 wandb
+tqdm
