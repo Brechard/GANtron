@@ -218,6 +218,7 @@ class Decoder(nn.Module):
         self.p_attention_dropout = hparams.p_attention_dropout
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.noise_size = hparams.noise_size
+        self.fp16 = hparams.fp16_run
 
         self.prenet = Prenet(
             hparams.n_mel_channels * hparams.n_frames_per_step,
@@ -396,7 +397,10 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        memory = torch.cat([memory, torch.rand(memory.size(0), memory.size(1), self.noise_size).cuda()], dim=-1)
+        noise = torch.rand(memory.size(0), memory.size(1), self.noise_size).cuda()
+        if self.fp16:
+            noise = noise.half()
+        memory = torch.cat([memory, noise], dim=-1)
 
         decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
