@@ -1,6 +1,8 @@
-from text import symbols
-import ast
 import argparse
+import ast
+
+from text import symbols
+
 
 class HParams:
     def __init__(self, hparams_string=None):
@@ -18,7 +20,10 @@ class HParams:
         self.dist_url = "tcp://localhost:54321"
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
-        self.ignore_layers = ['embedding.weight']
+        self.ignore_layers = ['decoder.attention_rnn.weight_ih',
+                              'decoder.attention_layer.memory_layer.linear_layer.weight',
+                              'decoder.decoder_rnn.weight_ih', 'decoder.linear_projection.linear_layer.weight',
+                              'decoder.gate_layer.linear_layer.weight']
 
         ################################
         # Data Parameters             #
@@ -110,4 +115,3 @@ class HParams:
                 continue
             if value is not None:
                 self.add_param(param, value)
-
