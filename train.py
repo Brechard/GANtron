@@ -392,7 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
     parser.add_argument('--group_name', type=str, default='group_name', required=False, help='Distributed group name')
     parser.add_argument('--hparams', type=str, required=False, help='comma separated name=value pairs')
-    parser.add_argument('--wavs_path', type=str, required=True, help='path to the wavs files')
+    parser.add_argument('--wavs_path', type=str, default='/home/mi343017/wavs/', help='path to the wavs files')
     parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
     parser.add_argument('--real', type=int, default=1, required=False, help='value of real mel for Wasserstein loss')
 
@@ -427,7 +427,7 @@ if __name__ == '__main__':
     if args.resume != '':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
-        wandb.init(project="GANtron", config=hparams.__dict__)
+        wandb.init(project="GANtron", config=hparams.__dict__, name=name)
     wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
