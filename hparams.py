@@ -11,7 +11,7 @@ class HParams:
         # Experiment Parameters        #
         ################################
         self.epochs = 2
-        self.iters_per_checkpoint = 1000
+        self.iters_per_checkpoint = 500
         self.seed = 1234
         self.dynamic_loss_scaling = True
         self.fp16_run = False
