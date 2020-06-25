@@ -385,8 +385,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
-    parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
-    parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
+    parser.add_argument('-c', '--checkpoint_path', type=str, default='/home/mi343017/GANtron/tacotron2_statedict.pt',
+                        required=False, help='checkpoint path')
+    parser.add_argument('--warm_start', type=bool, default=True, help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
     parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
     parser.add_argument('--group_name', type=str, default='group_name', required=False, help='Distributed group name')

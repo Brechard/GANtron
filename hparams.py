@@ -10,7 +10,7 @@ class HParams:
         ################################
         # Experiment Parameters        #
         ################################
-        self.epochs = 500
+        self.epochs = 2
         self.iters_per_checkpoint = 1000
         self.seed = 1234
         self.dynamic_loss_scaling = True
