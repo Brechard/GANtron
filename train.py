@@ -381,6 +381,8 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
                     wandb.save(checkpoint_path)
+            if iteration > hparams.sweep_iters:
+                return
 
 
 if __name__ == '__main__':
