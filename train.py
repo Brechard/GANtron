@@ -312,7 +312,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} {extra_log}"
                 )
 
-                logger.log_values(step=iteration, reduced_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
+                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
                                   discriminator_learning_rate=d_learning_rate, discriminator_duration=duration)
 
                 disc_times += 1
@@ -362,7 +362,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
                     logger.log_values(step=iteration, generator_loss=total_loss, adversarial_loss=adv_loss,
                                       mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
-                                      generator_learning_rate=g_learning_rate, generator_duration=duration)
+                                      generator_learning_rate=g_learning_rate, generation_duration=duration)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
