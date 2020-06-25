@@ -48,7 +48,7 @@ def gradient_penalty(discriminator, real_data, generated_data, real_lengths, gen
     interpolated = Variable(interpolated, requires_grad=True).cuda()
 
     # Calculate probability of interpolated examples
-    prob_interpolated = discriminator(interpolated)
+    prob_interpolated = discriminator(interpolated.transpose(1, 2))
 
     # Calculate gradients of probabilities with respect to examples
     gradients = torch_grad(outputs=prob_interpolated, inputs=interpolated,
@@ -313,8 +313,8 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 )
 
                 logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss,
-                                  fake_loss=fake_loss,
-                                  discriminator_learning_rate=d_learning_rate, discriminator_duration=duration)
+                                  fake_loss=fake_loss, discriminator_learning_rate=d_learning_rate,
+                                  discriminator_duration=duration)
 
                 disc_times += 1
                 if disc_times > hparams.d_freq:
