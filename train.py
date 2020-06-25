@@ -249,7 +249,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                                f"Taco loss {round_(taco_loss, 6)} "
                                                f"Grad Norm {round_(grad_norm, 6)}")
                 logger.log_values(
-                    total_loss=total_loss, mel_loss=mel_loss, gate_loss=gate_loss,
+                    generator_loss=total_loss, mel_loss=mel_loss, gate_loss=gate_loss,
                     grad_norm=grad_norm, generator_learning_rate=g_learning_rate, duration=duration, step=iteration)
 
             iteration += 1
