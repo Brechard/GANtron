@@ -375,12 +375,12 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 val_loss = validate(generator, criterion, valset, iteration,
                                     hparams.batch_size, n_gpus, collate_fn,
                                     hparams.distributed_run, rank)
-                if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
-                    checkpoint_path = output_directory + name
-                    save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
-                                    checkpoint_path)
-                    wandb.save(checkpoint_path)
+                # if rank == 0:
+                #     name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
+                #     checkpoint_path = output_directory + name
+                #     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
+                #                     checkpoint_path)
+                #     wandb.save(checkpoint_path)
             if iteration > hparams.sweep_iters:
                 return
 
