@@ -467,9 +467,10 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.window = hparams.discriminator_window
         self.in_dim = self.window * hparams.n_mel_channels
+        first_hidden = (int(self.in_dim / hparams.discriminator_dim) + 1) * hparams.discriminator_dim
         self.discriminator = torch.nn.Sequential(
-            DiscConv1d(self.in_dim, hparams.discriminator_dim, 5),
-            DiscConv1d(hparams.discriminator_dim, hparams.discriminator_dim, 5, dilation=2),
+            DiscConv1d(self.in_dim, first_hidden, 5),
+            DiscConv1d(first_hidden, hparams.discriminator_dim, 5, dilation=2),
             DiscConv1d(hparams.discriminator_dim, hparams.discriminator_dim, 5, dilation=2),
             DiscConv1d(hparams.discriminator_dim, hparams.n_mel_channels, 5, dilation=2),
             torch.nn.Conv1d(hparams.n_mel_channels, 1, 1, bias=True),
@@ -487,11 +488,11 @@ class Discriminator(nn.Module):
         if inputs.size(1) % self.window != 0:
             inputs = torch.cat((inputs[:, :-(inputs.size(1) % self.window)], inputs[:, -self.window:]), dim=1)
 
-        inputs = inputs.reshape(inputs.size(0), -1, self.in_dim)
-        return self.discriminator(inputs.transpose(1, 2)).squeeze(1)
+        inputs = inputs.reshape(inputs.size(0), self.in_dim, -1)
+        return self.discriminator(inputs).squeeze(1)
 
     def adversarial_loss(self, inputs, target_length):
-        outputs = self.forward(inputs)
+        outputs = self.forward(inputs.transpose(1, 2))
         loss = 0
         for batch in range(target_length.size(0)):
             to = target_length[batch].to(torch.FloatTensor()) / self.window

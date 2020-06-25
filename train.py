@@ -48,7 +48,7 @@ def gradient_penalty(discriminator, real_data, generated_data, real_lengths, gen
     interpolated = Variable(interpolated, requires_grad=True).cuda()
 
     # Calculate probability of interpolated examples
-    prob_interpolated = discriminator(interpolated)
+    prob_interpolated = discriminator(interpolated.transpose(1, 2))
 
     # Calculate gradients of probabilities with respect to examples
     gradients = torch_grad(outputs=prob_interpolated, inputs=interpolated,
