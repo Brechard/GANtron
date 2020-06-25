@@ -205,7 +205,6 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
     generator.train()
     is_overflow = False
-    gen_times, disc_times = 1, 0
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     for epoch in progress_bar:
@@ -259,7 +258,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                     hparams.batch_size, n_gpus, collate_fn,
                                     hparams.distributed_run, rank)
                 if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
+                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.pt'
                     checkpoint_path = output_directory + name
                     save_checkpoint(generator, g_optimizer, g_learning_rate, iteration, checkpoint_path)
                     wandb.save(checkpoint_path)
@@ -282,6 +281,7 @@ if __name__ == '__main__':
     parser.add_argument('--hparams', type=str,
                         required=False, help='comma separated name=value pairs')
     parser.add_argument('--wavs_path', type=str, required=True, help='Path to the wavs files')
+    parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
 
     args = parser.parse_args()
     hparams = HParams(args.hparams)
@@ -297,9 +297,15 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    wandb.init(project="GANtron", config=hparams.__dict__)
+    if args.resume != '':
+        wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
+    else:
+        wandb.init(project="GANtron", config=hparams.__dict__)
+    wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
     train(args.output_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)
+
+#WANDB_MODEdryrun
