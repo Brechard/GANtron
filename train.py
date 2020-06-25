@@ -98,8 +98,8 @@ def load_checkpoint(checkpoint_path, model, optimizer):
     print("Loading checkpoint '{}'".format(checkpoint_path))
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     model.load_state_dict(checkpoint_dict['state_dict'])
-    optimizer.load_state_dict(checkpoint_dict['optimizer'])
-    learning_rate = checkpoint_dict['learning_rate']
+    optimizer.load_state_dict(checkpoint_dict['g_optimizer'])
+    learning_rate = checkpoint_dict['g_learning_rate']
     iteration = checkpoint_dict['iteration']
     print("Loaded checkpoint '{}' from iteration {}".format(
         checkpoint_path, iteration))
