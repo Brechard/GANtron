@@ -7,18 +7,16 @@ import torch
 import torch.distributed as dist
 import wandb
 from numpy import finfo
-from torch.autograd import Variable
-from torch.autograd import grad as torch_grad
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+from tqdm import tqdm
 
+import logger
 from data_utils import TextMelLoader, TextMelCollate
 from distributed import apply_gradient_allreduce
 from hparams import HParams
-import logger
 from loss_function import Tacotron2Loss
 from model import Tacotron2
-from utils import get_mask_from_lengths
 
 
 def round_(tensor, decimals):
@@ -209,9 +207,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     is_overflow = False
     gen_times, disc_times = 1, 0
     # ================ MAIN TRAINING LOOP! ===================
-    for epoch in range(epoch_offset, hparams.epochs):
-        print("Epoch: {}".format(epoch))
-        for i, batch in enumerate(train_loader):
+    progress_bar = tqdm(range(epoch_offset, hparams.epochs))
+    for epoch in progress_bar:
+        progress_bar.set_description(f'Epoch {epoch}')
+        progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
+        for i, batch in progress_bar_2:
             start = time.perf_counter()
             """ Train Generator """
             for param_group in g_optimizer.param_groups:
@@ -246,10 +246,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
             g_optimizer.step()
             if not is_overflow and rank == 0:
                 duration = time.perf_counter() - start
-                print(f"{iteration} Generator loss {round(reduced_loss, 6)} "
-                      f"Taco loss {round_(taco_loss, 6)} "
-                      f"Grad Norm {round_(grad_norm, 6)} {duration:.2f}s/it")
-
+                progress_bar_2.set_description(f"{iteration} Generator loss {round(reduced_loss, 6)} "
+                                               f"Taco loss {round_(taco_loss, 6)} "
+                                               f"Grad Norm {round_(grad_norm, 6)}")
                 logger.log_values(
                     total_loss=total_loss, mel_loss=mel_loss, gate_loss=gate_loss,
                     grad_norm=grad_norm, generator_learning_rate=g_learning_rate, duration=duration, step=iteration)
