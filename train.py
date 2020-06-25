@@ -395,8 +395,22 @@ if __name__ == '__main__':
     parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
     parser.add_argument('--real', type=int, default=1, required=False, help='value of real mel for Wasserstein loss')
 
+    parser.add_argument('--d_learning_rate', type=float, required=False, help='Discriminator learning rate')
+    parser.add_argument('--g_learning_rate', type=float, required=False, help='Generator learning rate')
+    parser.add_argument('--g_freq', type=int, required=False, help='Frequency of the generator')
+    parser.add_argument('--d_freq', type=int, required=False, help='Frequency of the discriminator')
+    parser.add_argument('--clipping_value', type=float, required=False, help='Clipping value')
+    parser.add_argument('--gradient_penalty_lambda', type=float, required=False, help='Gradient clipping')
+    parser.add_argument('--discriminator_window', type=int, required=False, help='Discriminator window')
+
     args = parser.parse_args()
     hparams = HParams(args.hparams)
+    hparams.add_params(args)
+    name = f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.g_learning_rate}gLR-{hparams.d_learning_rate}dLR-' \
+           f'{hparams.discriminator_dim}w-'
+    name += f'{str(hparams.clipping_value) + "CV" if hparams.clipping_value > 0 else "noCV-"}' \
+            f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
+
     real = 1
     fake = - real
 

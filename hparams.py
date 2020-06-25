@@ -1,5 +1,6 @@
 from text import symbols
 import ast
+import argparse
 
 class HParams:
     def __init__(self, hparams_string=None):
@@ -89,10 +90,24 @@ class HParams:
         self.d_learning_rate = 1e-5
         self.weight_decay = 1e-6
         self.grad_clip_thresh = 1.0
-        self.batch_size = 64
+        self.batch_size = 32
         self.mask_padding = True  # set model's padded outputs to padded values
 
         if hparams_string:
             for param in hparams_string.split(','):
                 key, value = param.split('=')
-                self.__setattr__(key, ast.literal_eval(value))
+                self.add_param(key, ast.literal_eval(value))
+
+    def add_param(self, param, value):
+        self.__setattr__(param, value)
+
+    def add_params(self, params):
+        if type(params) is argparse.Namespace:
+            params = params.__dict__
+
+        for param, value in params.items():
+            if param == 'hparams':
+                continue
+            if value is not None:
+                self.add_param(param, value)
+
