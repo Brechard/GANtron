@@ -312,7 +312,8 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} {extra_log}"
                 )
 
-                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
+                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss,
+                                  fake_loss=fake_loss,
                                   discriminator_learning_rate=d_learning_rate, discriminator_duration=duration)
 
                 disc_times += 1
@@ -387,7 +388,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
     parser.add_argument('-c', '--checkpoint_path', type=str, default='/home/mi343017/GANtron/tacotron2_statedict.pt',
                         required=False, help='checkpoint path')
-    parser.add_argument('--warm_start', type=bool, default=True, help='load model weights only, ignore specified layers')
+    parser.add_argument('--warm_start', type=bool, default=True,
+                        help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
     parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
     parser.add_argument('--group_name', type=str, default='group_name', required=False, help='Distributed group name')
@@ -407,8 +409,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.g_learning_rate}gLR-{hparams.d_learning_rate}dLR-' \
-           f'{hparams.discriminator_dim}w-'
+    name = f'{hparams.g_freq}g{hparams.d_freq}d-{str(round(hparams.g_learning_rate, 6))}gLR-' \
+           f'{str(round(hparams.d_learning_rate, 6))}dLR-{hparams.discriminator_dim}w-'
     name += f'{str(hparams.clipping_value) + "CV" if hparams.clipping_value > 0 else "noCV-"}' \
             f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
 
