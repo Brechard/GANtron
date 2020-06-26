@@ -1,5 +1,5 @@
 import matplotlib
-# matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.pylab as plt
 import numpy as np
 import wandb
