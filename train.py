@@ -187,13 +187,14 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
                 reduced_gate_val_loss = gate_loss.item()
             val_mel_loss += reduced_mel_val_loss
             val_gate_loss += reduced_gate_val_loss
+            input_lengths, output_lengths = x[1], x[-1]
         val_mel_loss = val_mel_loss / (i + 1)
         val_gate_loss = val_gate_loss / (i + 1)
 
     model.train()
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
-        logger.log_validation(val_mel_loss, val_gate_loss, y, y_pred, iteration)
+        logger.log_validation(val_mel_loss, val_gate_loss, y, y_pred, input_lengths, output_lengths, iteration)
     return val_mel_loss + val_gate_loss
 
 

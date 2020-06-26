@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import matplotlib.pylab as plt
 import numpy as np
 import wandb
@@ -25,6 +25,7 @@ def plot_alignment_to_numpy(alignment, info=None, wandb_im=False):
 
     fig.canvas.draw()
     data = save_figure_to_numpy(fig)
+    plt.show()
     plt.close()
     if wandb_im:
         return wandb.Image(data)
@@ -47,6 +48,7 @@ def plot_spectrogram_to_numpy(pred_mel, ground_truth, wandb_im=False):
 
     fig.canvas.draw()
     data = save_figure_to_numpy(fig)
+    plt.show()
     plt.close()
     if wandb_im:
         return wandb.Image(data)
@@ -66,6 +68,7 @@ def plot_gate_outputs_to_numpy(gate_targets, gate_outputs, wandb_im=False):
 
     fig.canvas.draw()
     data = save_figure_to_numpy(fig)
+    plt.show()
     plt.close()
     if wandb_im:
         return wandb.Image(data)
