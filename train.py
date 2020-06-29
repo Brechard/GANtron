@@ -288,7 +288,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 discriminator_loss = (real_loss + fake_loss) / 2
                 extra_log = ''
                 if hparams.clipping_value > 0:
-                    torch.nn.utils.clip_grad_norm(discriminator.parameters(), hparams.clipping_value)
+                    torch.nn.utils.clip_grad_norm_(discriminator.parameters(), hparams.clipping_value)
                 elif hparams.gradient_penalty_lambda > 0:
                     gp = gradient_penalty(discriminator, real_mel, generated_mel.detach(), output_lengths,
                                           generated_output_lengths)
