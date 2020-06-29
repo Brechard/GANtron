@@ -467,7 +467,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.window = hparams.discriminator_window
         self.in_dim = self.window * hparams.n_mel_channels
-        first_hidden = (int(self.in_dim / hparams.discriminator_dim) + 1) * hparams.discriminator_dim
+        first_hidden = min((int(self.in_dim / hparams.discriminator_dim) + 1) * hparams.discriminator_dim, 1024)
         self.discriminator = torch.nn.Sequential(
             DiscConv1d(self.in_dim, first_hidden, 5),
             DiscConv1d(first_hidden, hparams.discriminator_dim, 5, dilation=2),
