@@ -187,13 +187,14 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
                 reduced_gate_val_loss = gate_loss.item()
             val_mel_loss += reduced_mel_val_loss
             val_gate_loss += reduced_gate_val_loss
+            input_lengths, output_lengths = x[1], x[-1]
         val_mel_loss = val_mel_loss / (i + 1)
         val_gate_loss = val_gate_loss / (i + 1)
 
     model.train()
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
-        logger.log_validation(val_mel_loss, val_gate_loss, y, y_pred, iteration)
+        logger.log_validation(val_mel_loss, val_gate_loss, y, y_pred, input_lengths, output_lengths, iteration)
     return val_mel_loss + val_gate_loss
 
 
@@ -263,6 +264,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     discriminator.train()
     is_overflow = False
     gen_times, disc_times = 1, 0
+    prev_check = None
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     for epoch in progress_bar:
@@ -287,7 +289,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 discriminator_loss = (real_loss + fake_loss) / 2
                 extra_log = ''
                 if hparams.clipping_value > 0:
-                    torch.nn.utils.clip_grad_norm(discriminator.parameters(), hparams['clipping_value'])
+                    torch.nn.utils.clip_grad_norm_(discriminator.parameters(), hparams.clipping_value)
                 elif hparams.gradient_penalty_lambda > 0:
                     gp = gradient_penalty(discriminator, real_mel, generated_mel.detach(), output_lengths,
                                           generated_output_lengths)
@@ -312,8 +314,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} {extra_log}"
                 )
 
-                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss, fake_loss=fake_loss,
-                                  discriminator_learning_rate=d_learning_rate, discriminator_duration=duration)
+                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss,
+                                  fake_loss=fake_loss, discriminator_learning_rate=d_learning_rate,
+                                  discriminator_duration=duration)
 
                 disc_times += 1
                 if disc_times > hparams.d_freq:
@@ -380,6 +383,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
                     wandb.save(checkpoint_path)
+                    if prev_check is not None:
+                        os.remove(prev_check)
+                    prev_check = checkpoint_path
 
 
 if __name__ == '__main__':
@@ -397,6 +403,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     hparams = HParams(args.hparams)
+    hparams.add_params(args)
+    name = f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
+           f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'
+    name += f'{str(hparams.clipping_value) + "CV-" if hparams.clipping_value > 0 else "noCV-"}' \
+            f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
+
     real = 1
     fake = - real
 
@@ -412,7 +424,7 @@ if __name__ == '__main__':
     if args.resume != '':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
-        wandb.init(project="GANtron", config=hparams.__dict__)
+        wandb.init(project="GANtron", config=hparams.__dict__, name=name)
     wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
