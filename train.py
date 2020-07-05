@@ -295,6 +295,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                           generated_output_lengths)
                     extra_log = f' GP {round_(gp, 3)} '
                     discriminator_loss += hparams.gradient_penalty_lambda * gp
+                    logger.log_values(step=iteration, gradient_penalty=gp)
 
                 if hparams.distributed_run:
                     reduced_loss = reduce_tensor(discriminator_loss.data, n_gpus).item()
