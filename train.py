@@ -378,7 +378,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                     hparams.batch_size, n_gpus, collate_fn,
                                     hparams.distributed_run, rank)
                 if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.cktp'
+                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
                     checkpoint_path = output_directory + name
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
@@ -426,7 +426,7 @@ if __name__ == '__main__':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
         wandb.init(project="GANtron", config=hparams.__dict__, name=name)
-    wandb.save("*.pt")
+    wandb.save("*.ckpt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
