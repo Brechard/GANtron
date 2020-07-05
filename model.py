@@ -397,7 +397,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        noise = torch.rand(memory.size(0), memory.size(1), self.noise_size).cuda()
+        noise = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
         if self.fp16:
             noise = noise.half()
         memory = torch.cat([memory, noise], dim=-1)
@@ -423,7 +423,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference(self, memory):
+    def inference(self, memory, style):
         """ Decoder inference
         PARAMS
         ------
@@ -435,6 +435,12 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
+        if style is None:
+            style = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
+            print(style.shape)
+        if self.fp16:
+            style = style.half()
+        memory = torch.cat([memory, style], dim=-1)
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
@@ -565,11 +571,11 @@ class Tacotron2(nn.Module):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
             output_lengths)
 
-    def inference(self, inputs):
-        embedded_inputs = self.embedding(inputs).transpose(1, 2)
+    def inference(self, text_inputs, style=None):
+        embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
         encoder_outputs = self.encoder.inference(embedded_inputs)
         mel_outputs, gate_outputs, alignments = self.decoder.inference(
-            encoder_outputs)
+            encoder_outputs, style)
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet

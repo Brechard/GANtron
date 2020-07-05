@@ -404,7 +404,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{"p-" if args.c is not None else ""}' \
+    name = f'{"p-" if args.checkpoint_path is not None else ""}' \
            f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
            f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'
     name += f'{str(hparams.clipping_value) + "CV-" if hparams.clipping_value > 0 else "noCV-"}' \

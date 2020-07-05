@@ -2,3 +2,7 @@
 	path = waveglow
 	url = https://github.com/NVIDIA/waveglow
 	branch = master
+[submodule "WaveGlow"]
+	path = WaveGlow
+	url = https://github.com/NVIDIA/WaveGlow
+	branch = master
