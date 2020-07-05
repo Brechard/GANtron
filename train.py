@@ -294,6 +294,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                           generated_output_lengths)
                     extra_log = f' GP {round_(gp, 3)} '
                     discriminator_loss += hparams.gradient_penalty_lambda * gp
+                    logger.log_values(step=iteration, gradient_penalty=gp)
 
                 if hparams.distributed_run:
                     reduced_loss = reduce_tensor(discriminator_loss.data, n_gpus).item()
@@ -389,9 +390,8 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
-    parser.add_argument('-c', '--checkpoint_path', type=str, default='/home/mi343017/GANtron/tacotron2_statedict.pt',
-                        required=False, help='checkpoint path')
-    parser.add_argument('--warm_start', type=bool, default=True,
+    parser.add_argument('-c', '--checkpoint_path', type=str, required=False, help='checkpoint path')
+    parser.add_argument('--warm_start', type=bool, default=False,
                         help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
     parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
@@ -412,7 +412,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
+    name = f'{"p-" if args.checkpoint_path is not None else ""}' \
+           f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
            f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'
     name += f'{str(hparams.clipping_value) + "CV-" if hparams.clipping_value > 0 else "noCV-"}' \
             f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
@@ -433,7 +434,7 @@ if __name__ == '__main__':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
         wandb.init(project="GANtron", config=hparams.__dict__, name=name)
-    wandb.save("*.pt")
+    wandb.save("*.ckpt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 

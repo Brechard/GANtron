@@ -397,7 +397,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        noise = torch.rand(memory.size(0), memory.size(1), self.noise_size).cuda()
+        noise = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
         if self.fp16:
             noise = noise.half()
         memory = torch.cat([memory, noise], dim=-1)
@@ -423,7 +423,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, gate_outputs, alignments
 
-    def inference(self, memory):
+    def inference(self, memory, style):
         """ Decoder inference
         PARAMS
         ------
@@ -435,6 +435,12 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
+        if style is None:
+            style = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
+            print(style.shape)
+        if self.fp16:
+            style = style.half()
+        memory = torch.cat([memory, style], dim=-1)
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
