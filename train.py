@@ -264,6 +264,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     discriminator.train()
     is_overflow = False
     gen_times, disc_times = 1, 0
+    gen_iters = 0
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     for epoch in progress_bar:
@@ -324,6 +325,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     gen_times = 1
             else:
                 """ Train Generator """
+                gen_iters += 1
                 for param_group in g_optimizer.param_groups:
                     param_group['lr'] = g_learning_rate
 
@@ -383,7 +385,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 #     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                 #                     checkpoint_path)
                 #     wandb.save(checkpoint_path)
-            if iteration > hparams.sweep_iters:
+            if gen_iters > hparams.sweep_iters:
                 return
 
 
