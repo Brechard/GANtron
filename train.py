@@ -138,30 +138,26 @@ def warm_start_model(checkpoint_path, model, ignore_layers):
     return model
 
 
-def load_checkpoint(checkpoint_path, model, g_optimizer, d_optimizer):
+def load_checkpoint(checkpoint_path, model, g_optimizer):
     assert os.path.isfile(checkpoint_path)
     print("Loading checkpoint '{}'".format(checkpoint_path))
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     model.load_state_dict(checkpoint_dict['state_dict'])
     g_optimizer.load_state_dict(checkpoint_dict['g_optimizer'])
     g_learning_rate = checkpoint_dict['g_learning_rate']
-    d_optimizer.load_state_dict(checkpoint_dict['d_optimizer'])
-    d_learning_rate = checkpoint_dict['d_learning_rate']
     iteration = checkpoint_dict['iteration']
     print("Loaded checkpoint '{}' from iteration {}".format(
         checkpoint_path, iteration))
-    return model, g_optimizer, d_optimizer, g_learning_rate, d_learning_rate, iteration
+    return model, g_optimizer, g_learning_rate, iteration
 
 
-def save_checkpoint(model, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration, filepath):
+def save_checkpoint(model, g_optimizer, g_learning_rate, iteration, filepath):
     print("Saving model and optimizer state at iteration {} to {}".format(
         iteration, filepath))
     torch.save({'iteration': iteration,
                 'state_dict': model.state_dict(),
                 'g_optimizer': g_optimizer.state_dict(),
-                'g_learning_rate': g_learning_rate,
-                'd_optimizer': d_optimizer.state_dict(),
-                'd_learning_rate': d_learning_rate}, filepath)
+                'g_learning_rate': g_learning_rate}, filepath)
 
 
 def validate(model, criterion, valset, iteration, batch_size, n_gpus,
@@ -222,24 +218,20 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     torch.manual_seed(hparams.seed)
     torch.cuda.manual_seed(hparams.seed)
 
-    generator, discriminator = load_model(hparams)
+    generator, _ = load_model(hparams)
 
     wandb.watch(generator, log='all', log_freq=hparams.iters_per_checkpoint)
-    wandb.watch(discriminator, log='all', log_freq=hparams.iters_per_checkpoint)
 
     g_learning_rate = hparams.g_learning_rate
     d_learning_rate = hparams.d_learning_rate
     g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_learning_rate, weight_decay=hparams.weight_decay)
-    d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_learning_rate, weight_decay=hparams.weight_decay)
 
     if hparams.fp16_run:
         from apex import amp
         generator, g_optimizer = amp.initialize(generator, g_optimizer, opt_level='O2')
-        discriminator, d_optimizer = amp.initialize(discriminator, d_optimizer, opt_level='O2')
 
     if hparams.distributed_run:
         generator = apply_gradient_allreduce(generator)
-        discriminator = apply_gradient_allreduce(discriminator)
 
     criterion = Tacotron2Loss()
 
@@ -252,18 +244,15 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
         if warm_start:
             generator = warm_start_model(checkpoint_path, generator, hparams.ignore_layers)
         else:
-            generator, g_optimizer, d_optimizer, _g_learning_rate, _d_learning_rate, iteration = load_checkpoint(
-                checkpoint_path, generator, g_optimizer, d_optimizer)
+            generator, g_optimizer, _g_learning_rate, iteration = load_checkpoint(
+                checkpoint_path, generator, g_optimizer)
             if hparams.use_saved_learning_rate:
                 g_learning_rate = _g_learning_rate
-                d_learning_rate = _d_learning_rate
             iteration += 1  # next iteration is iteration + 1
             epoch_offset = max(0, int(iteration / len(train_loader)))
 
     generator.train()
-    discriminator.train()
     is_overflow = False
-    gen_times, disc_times = 1, 0
     prev_check = None
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
@@ -272,106 +261,46 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
         progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
         for i, batch in progress_bar_2:
             start = time.perf_counter()
-            if disc_times > 0:
-                """ Train Discriminator """
-                for param_group in d_optimizer.param_groups:
-                    param_group['lr'] = d_learning_rate
-                discriminator.zero_grad()
-                x, y = generator.parse_batch(batch)
-                real_mel, output_lengths = x[2], x[-1]
-                # how well can it label as real?
-                real_loss = real * discriminator.adversarial_loss(real_mel, output_lengths)
+            """ Train Generator """
+            for param_group in g_optimizer.param_groups:
+                param_group['lr'] = g_learning_rate
 
-                # how well can it label as fake?
-                fake_loss = fake * discriminator.adversarial_loss(generated_mel.detach(), generated_output_lengths)
+            generator.zero_grad()
+            x, y = generator.parse_batch(batch)
+            y_pred = generator(x)
 
-                # discriminator loss is the average of these
-                discriminator_loss = (real_loss + fake_loss) / 2
-                extra_log = ''
-                if hparams.clipping_value > 0:
-                    torch.nn.utils.clip_grad_norm_(discriminator.parameters(), hparams.clipping_value)
-                elif hparams.gradient_penalty_lambda > 0:
-                    gp = gradient_penalty(discriminator, real_mel, generated_mel.detach(), output_lengths,
-                                          generated_output_lengths)
-                    extra_log = f' GP {round_(gp, 3)} '
-                    discriminator_loss += hparams.gradient_penalty_lambda * gp
-                    logger.log_values(step=iteration, gradient_penalty=gp)
+            mel_loss, gate_loss = criterion(y_pred, y)
+            taco_loss = mel_loss + gate_loss
+            total_loss = taco_loss
 
-                if hparams.distributed_run:
-                    reduced_loss = reduce_tensor(discriminator_loss.data, n_gpus).item()
-                else:
-                    reduced_loss = discriminator_loss.item()
-
-                if hparams.fp16_run:
-                    with amp.scale_loss(discriminator_loss, d_optimizer) as scaled_loss:
-                        scaled_loss.backward()
-                else:
-                    discriminator_loss.backward()
-                d_optimizer.step()
-
-                duration = time.perf_counter() - start
-                progress_bar_2.set_description(
-                    f"{iteration} Discriminator loss {round(reduced_loss, 6)} "
-                    f"real loss {round_(real_loss, 6)} fake loss {round_(fake_loss, 6)} {extra_log}"
-                )
-
-                logger.log_values(step=iteration, discriminator_loss=reduced_loss, real_loss=real_loss,
-                                  fake_loss=fake_loss, discriminator_learning_rate=d_learning_rate,
-                                  discriminator_duration=duration)
-
-                disc_times += 1
-                if disc_times > hparams.d_freq:
-                    disc_times = 0
-                    gen_times = 1
+            if hparams.distributed_run:
+                reduced_loss = reduce_tensor(total_loss.data, n_gpus).item()
             else:
-                """ Train Generator """
-                for param_group in g_optimizer.param_groups:
-                    param_group['lr'] = g_learning_rate
+                reduced_loss = total_loss.item()
 
-                generator.zero_grad()
-                x, y = generator.parse_batch(batch)
-                y_pred = generator(x)
-                generated_mel = y_pred[1]
-                generated_output_lengths = x[-1]
+            if hparams.fp16_run:
+                with amp.scale_loss(total_loss, g_optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                total_loss.backward()
 
-                mel_loss, gate_loss = criterion(y_pred, y)
-                taco_loss = mel_loss + gate_loss
-                adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
-                total_loss = taco_loss + adv_loss
+            if hparams.fp16_run:
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    amp.master_params(g_optimizer), hparams.grad_clip_thresh)
+                is_overflow = math.isnan(grad_norm)
+            else:
+                grad_norm = torch.nn.utils.clip_grad_norm_(
+                    generator.parameters(), hparams.grad_clip_thresh)
+            g_optimizer.step()
+            if not is_overflow and rank == 0:
+                duration = time.perf_counter() - start
+                progress_bar_2.set_description(f"{iteration} Generator loss {round(reduced_loss, 6)} "
+                                               f"Taco loss {round_(taco_loss, 6)} "
+                                               f"Grad Norm {round_(grad_norm, 6)}")
 
-                if hparams.distributed_run:
-                    reduced_loss = reduce_tensor(total_loss.data, n_gpus).item()
-                else:
-                    reduced_loss = total_loss.item()
-
-                if hparams.fp16_run:
-                    with amp.scale_loss(total_loss, g_optimizer) as scaled_loss:
-                        scaled_loss.backward()
-                else:
-                    total_loss.backward()
-
-                if hparams.fp16_run:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(
-                        amp.master_params(g_optimizer), hparams.grad_clip_thresh)
-                    is_overflow = math.isnan(grad_norm)
-                else:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(
-                        generator.parameters(), hparams.grad_clip_thresh)
-                g_optimizer.step()
-                if not is_overflow and rank == 0:
-                    duration = time.perf_counter() - start
-                    progress_bar_2.set_description(f"{iteration} Generator loss {round(reduced_loss, 6)} "
-                                                   f"Taco loss {round_(taco_loss, 6)} "
-                                                   f"Grad Norm {round_(grad_norm, 6)}")
-
-                    logger.log_values(step=iteration, generator_loss=total_loss, adversarial_loss=adv_loss,
-                                      mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
-                                      generator_learning_rate=g_learning_rate, generation_duration=duration)
-
-                gen_times += 1
-                if gen_times > hparams.g_freq:
-                    gen_times = 0
-                    disc_times = 1
+                logger.log_values(step=iteration, generator_loss=total_loss,
+                                  mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
+                                  generator_learning_rate=g_learning_rate, generation_duration=duration)
 
             iteration += 1
             if not is_overflow and (iteration % hparams.iters_per_checkpoint == 0):
@@ -381,8 +310,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 if rank == 0:
                     name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
                     checkpoint_path = output_directory + name
-                    save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
-                                    checkpoint_path)
+                    save_checkpoint(generator, g_optimizer, g_learning_rate, iteration, checkpoint_path)
                     wandb.save(checkpoint_path)
                     if prev_check is not None:
                         os.remove(prev_check)
