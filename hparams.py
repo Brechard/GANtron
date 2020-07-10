@@ -85,7 +85,8 @@ class HParams:
         self.d_freq = 1
         self.clipping_value = 0.001
         self.gradient_penalty_lambda = 0
-        self.noise_size = 88
+        self.noise_size = 20
+        self.disc_warmp_up = 500
 
         ################################
         # Optimization Hyperparameters #
