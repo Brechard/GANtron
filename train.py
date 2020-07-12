@@ -272,7 +272,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
         progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
         for i, batch in progress_bar_2:
             start = time.perf_counter()
-            if disc_times > 0 or iteration < hparams.disc_warmp_up:
+            if disc_times > 0 or 0 < iteration < hparams.disc_warmp_up:
                 """ Train Discriminator """
                 for param_group in d_optimizer.param_groups:
                     param_group['lr'] = d_learning_rate
