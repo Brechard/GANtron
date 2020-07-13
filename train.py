@@ -2,6 +2,7 @@ import argparse
 import math
 import os
 import time
+from random import sample
 
 import torch
 import torch.distributed as dist
@@ -265,9 +266,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     is_overflow = False
     gen_times, disc_times = 1, 0
     prev_check = None
+    generated_mels = []
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     iter_rep = 10000
+    gen_warm = 5
     for epoch in progress_bar:
         progress_bar.set_description(f'Epoch {epoch}')
         progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
@@ -277,15 +280,24 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
             if iteration >= iter_rep and iteration - iter_rep * int(iteration / iter_rep) < 100:
                 do_disc = True
 
-            if disc_times > 0 or 0 < iteration < hparams.disc_warmp_up or do_disc:
+            if iteration > gen_warm and (disc_times > 0 or iteration < hparams.disc_warmp_up or do_disc):
                 """ Train Discriminator """
                 for param_group in d_optimizer.param_groups:
                     param_group['lr'] = d_learning_rate
+
+                for p in discriminator.parameters():  # reset requires_grad
+                    p.requires_grad = True
+
                 discriminator.zero_grad()
                 x, y = generator.parse_batch(batch)
                 real_mel, output_lengths = x[2], x[-1]
                 # how well can it label as real?
                 real_loss = real * discriminator.adversarial_loss(real_mel, output_lengths)
+
+                if len(generated_mels) > disc_times - 1:
+                    generated_mel = generated_mels[disc_times - 1]
+                if iteration < hparams.disc_warmp_up:
+                    generated_mel = sample(generated_mels, 1)[0]
 
                 # how well can it label as fake?
                 fake_loss = fake * discriminator.adversarial_loss(generated_mel.detach(), generated_output_lengths)
@@ -333,10 +345,16 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 for param_group in g_optimizer.param_groups:
                     param_group['lr'] = g_learning_rate
 
+                for p in discriminator.parameters():  # reset requires_grad
+                    p.requires_grad = False
+
                 generator.zero_grad()
                 x, y = generator.parse_batch(batch)
                 y_pred = generator(x)
                 generated_mel = y_pred[1]
+                generated_mels.append(generated_mel)
+                if len(generated_mels) > hparams.d_freq:
+                    generated_mels.pop(0)
                 generated_output_lengths = x[-1]
 
                 mel_loss, gate_loss = criterion(y_pred, y)
