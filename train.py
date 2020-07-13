@@ -19,7 +19,7 @@ from data_utils import TextMelLoader, TextMelCollate
 from distributed import apply_gradient_allreduce
 from hparams import HParams
 from loss_function import Tacotron2Loss
-from model import Tacotron2, Discriminator
+from model import Tacotron2, Discriminator, LinearDiscriminator
 from utils import get_mask_from_lengths
 
 
@@ -113,7 +113,8 @@ def prepare_dataloaders(hparams, wavs_path):
 
 def load_model(hparams):
     generator = Tacotron2(hparams).cuda()
-    disciminator = Discriminator(hparams).cuda()
+    disciminator = LinearDiscriminator(hparams) if hparams.discriminator_type == 'linear' else Discriminator(hparams)
+    disciminator = disciminator.cuda()
     if hparams.fp16_run:
         generator.decoder.attention_layer.score_mask_value = finfo('float16').min
 
@@ -266,7 +267,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     is_overflow = False
     gen_times, disc_times = 1, 0
     prev_check = None
-    generated_mels = []
+    generated_mel_list = []
     # ================ MAIN TRAINING LOOP! ===================
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     iter_rep = 10000
@@ -294,10 +295,10 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 # how well can it label as real?
                 real_loss = real * discriminator.adversarial_loss(real_mel, output_lengths)
 
-                if len(generated_mels) > disc_times - 1:
-                    generated_mel = generated_mels[disc_times - 1]
+                if len(generated_mel_list) > disc_times - 1:
+                    generated_mel, generated_output_lengths = generated_mel_list[disc_times - 1]
                 if iteration < hparams.disc_warmp_up:
-                    generated_mel = sample(generated_mels, 1)[0]
+                    generated_mel, generated_output_lengths = sample(generated_mel_list, 1)[0]
 
                 # how well can it label as fake?
                 fake_loss = fake * discriminator.adversarial_loss(generated_mel.detach(), generated_output_lengths)
@@ -352,10 +353,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 x, y = generator.parse_batch(batch)
                 y_pred = generator(x)
                 generated_mel = y_pred[1]
-                generated_mels.append(generated_mel)
-                if len(generated_mels) > hparams.d_freq:
-                    generated_mels.pop(0)
                 generated_output_lengths = x[-1]
+
+                generated_mel_list.append([generated_mel, generated_output_lengths])
+                if len(generated_mel_list) > hparams.d_freq:
+                    generated_mel_list.pop(0)
 
                 mel_loss, gate_loss = criterion(y_pred, y)
                 taco_loss = mel_loss + gate_loss
@@ -428,7 +430,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{"p-" if args.checkpoint_path is not None else ""}' \
+    name = f'{"lD" if hparams.discriminator_type == "linear" else "cD"}' \
+           f'{"p-" if args.checkpoint_path is not None else ""}' \
            f'{"fp16-" if hparams.fp16_run else ""}' \
            f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
            f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'

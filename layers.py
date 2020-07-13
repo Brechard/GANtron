@@ -60,6 +60,19 @@ class DiscConv1d(torch.nn.Module):
         return self.module(inputs)
 
 
+class DiscDense(torch.nn.Module):
+    def __init__(self, in_dim, out_dim, bias=True, dropout=0.5):
+        super().__init__()
+        self.module = torch.nn.Sequential(
+            torch.nn.Linear(in_dim, out_dim, bias=bias),
+            torch.nn.Dropout(dropout),
+            torch.nn.Tanh()
+        )
+
+    def forward(self, inputs):
+        return self.module(inputs)
+
+
 class TacotronSTFT(torch.nn.Module):
     def __init__(self, filter_length=1024, hop_length=256, win_length=1024,
                  n_mel_channels=80, sampling_rate=22050, mel_fmin=0.0,

@@ -4,8 +4,9 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
+import random
 
-from layers import ConvNorm, LinearNorm, DiscConv1d
+from layers import ConvNorm, LinearNorm, DiscConv1d, DiscDense
 from utils import to_gpu, get_mask_from_lengths
 
 
@@ -507,6 +508,51 @@ class Discriminator(nn.Module):
 
             to = to.to(torch.IntTensor())
             loss += torch.mean(outputs[batch, :to])
+
+        return loss / target_length.size(0)
+
+
+class LinearDiscriminator(nn.Module):
+    # Patch Discriminator (check the pix2pix git)
+
+    def __init__(self, hparams):
+        super(LinearDiscriminator, self).__init__()
+        self.discriminator = torch.nn.Sequential(
+            DiscDense(hparams.discriminator_window * hparams.n_mel_channels, hparams.discriminator_dim),
+            DiscDense(hparams.discriminator_dim, hparams.discriminator_dim),
+            DiscDense(hparams.discriminator_dim, hparams.discriminator_dim),
+            torch.nn.Linear(hparams.discriminator_dim, 1)
+        )
+        self.n_mel_channels = hparams.n_mel_channels
+        self.windows_size = hparams.discriminator_window
+        self.max_window_overlap = 6
+
+    def forward(self, inputs):
+        """
+        Args:
+            inputs: (Batch, discriminator_window * N_Mel) Mel spectrogram
+
+        Returns:
+            (Batch, 1) Real or Fake
+
+        """
+        return self.discriminator(inputs)
+
+    def adversarial_loss(self, inputs, target_length):
+        loss = 0
+        for i, single_input in enumerate(inputs):
+            if single_input.size(0) == self.n_mel_channels:
+                single_input = single_input.T
+            start_point = 0
+            windows = []
+            while start_point + self.windows_size < target_length[i]:
+                windows.append(single_input[start_point:start_point + self.windows_size].flatten())
+                start_point += self.windows_size - random.randint(0, self.max_window_overlap)
+            windows.append(single_input[target_length[i] - self.windows_size:target_length[i]].flatten())
+            windows = torch.stack(windows)
+            output = self.forward(windows)
+
+            loss += torch.mean(output)
 
         return loss / target_length.size(0)
 
