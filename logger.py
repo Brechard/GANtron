@@ -14,8 +14,10 @@ def log_values(step, commit=False, **kwargs):
     wandb.log(log_dict, step=step, commit=commit)
 
 
-def log_validation(mel_loss, gate_loss, y, y_pred, input_lengths, output_lengths, step, commit=False):
-    wandb.log({"Validation mel loss": mel_loss, 'Validation gate loss': gate_loss}, step=step, commit=commit)
+def log_validation(mel_loss, gate_loss, attn_loss, y, y_pred, input_lengths, output_lengths, step, commit=False):
+    wandb.log(
+        {"Validation mel loss": mel_loss, "Validation gate loss": gate_loss, "Validation attention loss": attn_loss},
+        step=step, commit=commit)
     _, mel_outputs, gate_outputs, alignments = y_pred
     mel_targets, gate_targets = y
 

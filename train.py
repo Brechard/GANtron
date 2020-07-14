@@ -176,27 +176,32 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
                                 shuffle=False, batch_size=batch_size,
                                 pin_memory=False, collate_fn=collate_fn)
 
-        val_mel_loss, val_gate_loss = 0.0, 0.0
+        val_mel_loss, val_gate_loss, val_attn_loss = 0.0, 0.0, 0.0
         for i, batch in enumerate(val_loader):
             x, y = model.parse_batch(batch)
             y_pred = model(x)
-            mel_loss, gate_loss = criterion(y_pred, y)
+            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[1], x[4])
             if distributed_run:
                 reduced_mel_val_loss = reduce_tensor(mel_loss.data, n_gpus).item()
                 reduced_gate_val_loss = reduce_tensor(gate_loss.data, n_gpus).item()
+                reduced_attn_val_loss = reduce_tensor(attn_loss.data, n_gpus).item()
             else:
                 reduced_mel_val_loss = mel_loss.item()
                 reduced_gate_val_loss = gate_loss.item()
+                reduced_attn_val_loss = gate_loss.item()
             val_mel_loss += reduced_mel_val_loss
             val_gate_loss += reduced_gate_val_loss
+            val_attn_loss += reduced_attn_val_loss
             input_lengths, output_lengths = x[1], x[-1]
         val_mel_loss = val_mel_loss / (i + 1)
         val_gate_loss = val_gate_loss / (i + 1)
+        val_attn_loss = val_attn_loss / (i + 1)
 
     model.train()
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
-        logger.log_validation(val_mel_loss, val_gate_loss, y, y_pred, input_lengths, output_lengths, iteration)
+        logger.log_validation(val_mel_loss, val_gate_loss, val_attn_loss, y, y_pred, input_lengths, output_lengths,
+                              iteration)
     return val_mel_loss + val_gate_loss
 
 
@@ -359,10 +364,10 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 if len(generated_mel_list) > hparams.d_freq:
                     generated_mel_list.pop(0)
 
-                mel_loss, gate_loss = criterion(y_pred, y)
+                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[4])
                 taco_loss = mel_loss + gate_loss
                 adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
-                total_loss = taco_loss + adv_loss
+                total_loss = taco_loss + adv_loss + 10 * atten_loss
 
                 if hparams.distributed_run:
                     reduced_loss = reduce_tensor(total_loss.data, n_gpus).item()
@@ -391,7 +396,8 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
                     logger.log_values(step=iteration, generator_loss=total_loss, adversarial_loss=adv_loss,
                                       mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
-                                      generator_learning_rate=g_learning_rate, generation_duration=duration)
+                                      generator_learning_rate=g_learning_rate, generation_duration=duration,
+                                      attention_loss=atten_loss)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
