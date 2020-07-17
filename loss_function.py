@@ -40,7 +40,7 @@ def get_sig():
 
 
 def gaussian(x, center, sig):
-    return torch.exp(-torch.pow(x - center, 2.) / (0.5 * torch.pow(sig, 1)))
+    return torch.exp(-torch.pow(x - center, 2.) / (2 * torch.pow(sig, 1)))
 
 
 def attention_mask(n_chars, n_frames):
