@@ -459,7 +459,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{"lD" if hparams.discriminator_type == "linear" else "cD"}' \
+    name = f'PLAY-{"lD" if hparams.discriminator_type == "linear" else "cD"}' \
            f'{"p-" if args.checkpoint_path is not None else ""}' \
            f'{"fp16-" if hparams.fp16_run else ""}' \
            f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
