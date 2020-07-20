@@ -429,8 +429,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     if prev_check is not None and val_loss < prev_val_loss:
                         os.remove(prev_check)
 
-                    if val_loss < best_val_loss and best_val_loss is not None:
-                        os.remove(best_val_loss_path)
+                    if val_loss < best_val_loss:
+                        if best_val_loss is not None and os.path.exists(best_val_loss_path):
+                            os.remove(best_val_loss_path)
                         best_val_loss = val_loss
                         best_val_loss_path = checkpoint_path
 
