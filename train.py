@@ -280,6 +280,10 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     progress_bar = tqdm(range(epoch_offset, hparams.epochs))
     iter_rep = 10000
     gen_warm = 5
+    prev_val_loss = float('inf')
+    best_val_loss = float('inf')
+    best_val_loss_path = None
+
     for epoch in progress_bar:
         progress_bar.set_description(f'Epoch {epoch}')
         progress_bar_2 = tqdm(enumerate(train_loader), total=len(train_loader))
@@ -422,9 +426,16 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
                     wandb.save(checkpoint_path)
-                    if prev_check is not None:
+                    if prev_check is not None and val_loss < prev_val_loss:
                         os.remove(prev_check)
+
+                    if val_loss < best_val_loss and best_val_loss is not None:
+                        os.remove(best_val_loss_path)
+                        best_val_loss = val_loss
+                        best_val_loss_path = checkpoint_path
+
                     prev_check = checkpoint_path
+                prev_val_loss = val_loss
 
             if iteration % hparams.reduce_lr_steps_every == 0:
                 g_learning_rate /= 2
