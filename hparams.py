@@ -89,7 +89,7 @@ class HParams:
         self.gradient_penalty_lambda = 0
         self.noise_size = 20
         self.disc_warmp_up = 500
-        self.discriminator_type = 'linear'
+        self.discriminator_type = 'conv'
 
 
         ################################
