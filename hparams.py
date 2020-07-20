@@ -83,9 +83,9 @@ class HParams:
         # GAN parameters
         self.discriminator_window = 20
         self.discriminator_dim = 512
-        self.g_freq = 1
-        self.d_freq = 4
-        self.clipping_value = 1
+        self.g_freq = 2
+        self.d_freq = 1
+        self.clipping_value = 0.001
         self.gradient_penalty_lambda = 0
         self.noise_size = 20
         self.disc_warmp_up = 500
@@ -97,7 +97,7 @@ class HParams:
         ################################
         self.use_saved_learning_rate = False
         self.g_learning_rate = 0.001
-        self.d_learning_rate = 0.00001
+        self.d_learning_rate = 0.0007
         self.weight_decay = 1e-6
         self.grad_clip_thresh = 1.0
         self.batch_size = 32
