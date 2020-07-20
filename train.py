@@ -197,6 +197,9 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
         val_gate_loss = val_gate_loss / (i + 1)
         val_attn_loss = val_attn_loss / (i + 1)
 
+    if iteration > hparams.attn_steps:
+        val_attn_loss = 0
+
     model.train()
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
@@ -367,7 +370,9 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[4])
                 taco_loss = mel_loss + gate_loss
                 adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
-                total_loss = taco_loss + adv_loss + 10 * atten_loss
+                total_loss = taco_loss + adv_loss
+                if iteration < hparams.attn_steps:
+                    total_loss += 10 * atten_loss
 
                 if hparams.distributed_run:
                     reduced_loss = reduce_tensor(total_loss.data, n_gpus).item()
@@ -396,8 +401,10 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
                     logger.log_values(step=iteration, generator_loss=total_loss, adversarial_loss=adv_loss,
                                       mel_loss=mel_loss, gate_loss=gate_loss, grad_norm=grad_norm,
-                                      generator_learning_rate=g_learning_rate, generation_duration=duration,
-                                      attention_loss=atten_loss)
+                                      generator_learning_rate=g_learning_rate, generation_duration=duration)
+
+                    if iteration < hparams.attn_steps:
+                        logger.log_values(step=iteration, attention_loss=atten_loss)
 
                 gen_times += 1
                 if gen_times > hparams.g_freq:
@@ -419,6 +426,10 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                         os.remove(prev_check)
                     prev_check = checkpoint_path
 
+            if iteration % hparams.reduce_lr_steps_every == 0:
+                g_learning_rate /= 2
+                d_learning_rate /= 2
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -432,6 +443,7 @@ if __name__ == '__main__':
     parser.add_argument('--wavs_path', type=str, required=True, help='path to the wavs files')
     parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
     parser.add_argument('--real', type=int, default=1, required=False, help='value of real mel for Wasserstein loss')
+    parser.add_argument('--attn_steps', type=int, required=False, help='Use attention loss for the first steps only')
 
     args = parser.parse_args()
     hparams = HParams(args.hparams)

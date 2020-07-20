@@ -24,6 +24,8 @@ class HParams:
                               'decoder.attention_layer.memory_layer.linear_layer.weight',
                               'decoder.decoder_rnn.weight_ih', 'decoder.linear_projection.linear_layer.weight',
                               'decoder.gate_layer.linear_layer.weight']
+        self.attn_steps = 30000
+        self.reduce_lr_steps_every = 5e4
 
         ################################
         # Data Parameters             #
@@ -60,7 +62,7 @@ class HParams:
         self.n_frames_per_step = 1  # currently only 1 is supported
         self.decoder_rnn_dim = 1024
         self.prenet_dim = 256
-        self.max_decoder_steps = 1000
+        self.max_decoder_steps = 500
         self.gate_threshold = 0.5
         self.p_attention_dropout = 0.1
         self.p_decoder_dropout = 0.1
@@ -88,6 +90,7 @@ class HParams:
         self.noise_size = 20
         self.disc_warmp_up = 500
         self.discriminator_type = 'linear'
+
 
         ################################
         # Optimization Hyperparameters #
