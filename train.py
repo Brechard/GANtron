@@ -421,7 +421,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                     hparams.batch_size, n_gpus, collate_fn,
                                     hparams.distributed_run, rank)
                 if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
+                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.pt'
                     checkpoint_path = output_directory + name
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
@@ -463,7 +463,7 @@ if __name__ == '__main__':
     name = f'{"lD" if hparams.discriminator_type == "linear" else "cD"}' \
            f'{"p-" if args.checkpoint_path is not None else ""}' \
            f'{"fp16-" if hparams.fp16_run else ""}' \
-           f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-' \
+           f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-{hparams.noise_size}n-' \
            f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'
     name += f'{str(hparams.clipping_value) + "CV-" if hparams.clipping_value > 0 else "noCV-"}' \
             f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
@@ -484,7 +484,7 @@ if __name__ == '__main__':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
         wandb.init(project="GANtron", config=hparams.__dict__, name=name)
-    wandb.save("*.ckpt")
+    wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
