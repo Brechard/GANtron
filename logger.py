@@ -15,9 +15,6 @@ def log_values(step, commit=False, **kwargs):
 
 
 def log_validation(mel_loss, gate_loss, attn_loss, y, y_pred, input_lengths, output_lengths, step, commit=False):
-    wandb.log(
-        {"Validation mel loss": mel_loss, "Validation gate loss": gate_loss, "Validation attention loss": attn_loss},
-        step=step, commit=commit)
     _, mel_outputs, gate_outputs, alignments = y_pred
     mel_targets, gate_targets = y
 
@@ -40,5 +37,7 @@ def log_validation(mel_loss, gate_loss, attn_loss, y, y_pred, input_lengths, out
         gates.append(plot_gate_outputs_to_numpy(gate_targets[idx, :lengths[1]].data.cpu().numpy(),
                                                 torch.sigmoid(gate_outputs[idx, :lengths[1]]).data.cpu().numpy(),
                                                 wandb_im=True))
-
-    wandb.log({"Alignment": alignmentss, 'Mel spectrogram': mels, 'Gate': gates})
+    wandb.log(
+        {"Validation mel loss": mel_loss, "Validation gate loss": gate_loss, "Validation attention loss": attn_loss,
+         "Alignment": alignmentss, 'Mel spectrogram': mels, 'Gate': gates},
+        step=step, commit=commit)
