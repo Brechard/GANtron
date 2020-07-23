@@ -488,5 +488,6 @@ if __name__ == '__main__':
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
+    wandb.save(args.output_directory + "/*.pt")
     train(args.output_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)
