@@ -438,7 +438,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                     prev_check = checkpoint_path
                 prev_val_loss = val_loss
 
-            if iteration % hparams.reduce_lr_steps_every == 0:
+            if iteration % hparams.reduce_lr_steps_every == 0 and hparams.reduce_lr_steps_every > 0:
                 g_learning_rate /= 2
                 d_learning_rate /= 2
 
