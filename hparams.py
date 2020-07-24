@@ -10,7 +10,7 @@ class HParams:
         ################################
         # Experiment Parameters        #
         ################################
-        self.epochs = 500
+        self.epochs = 200
         self.iters_per_checkpoint = 5000
         self.seed = 1234
         self.dynamic_loss_scaling = True
@@ -30,6 +30,7 @@ class HParams:
         self.speakers_embedding = 64
         self.use_labels = True
         self.use_noise = False
+        self.attention_with = 0.5
 
         ################################
         # Data Parameters             #
