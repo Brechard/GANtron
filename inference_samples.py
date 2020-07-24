@@ -18,6 +18,7 @@ import os
 def load_GANtron(path):
     hparams = HParams()
     hparams.sampling_rate = 22050
+    hparams.noise_size = args.noise_size
 
     model, _ = load_model(hparams)
     model.load_state_dict(torch.load(path)['state_dict'])
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--waveglow_path', type=str, required=False, help='waveglow checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Model name to save the ')
     parser.add_argument('--noise_size', type=int, required=True, help='Number of noise inputs')
-    parser.add_argument('--samples', type=int, default=0, help='Number of samples to generate')
+    parser.add_argument('--samples', type=int, default=200, help='Number of samples to generate')
 
     args = parser.parse_args()
 

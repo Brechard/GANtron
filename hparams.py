@@ -26,6 +26,10 @@ class HParams:
                               'decoder.gate_layer.linear_layer.weight']
         self.attn_steps = 30000
         self.reduce_lr_steps_every = 5e4
+        self.vesus_path = None
+        self.speakers_embedding = 64
+        self.use_labels = True
+        self.use_noise = False
 
         ################################
         # Data Parameters             #
@@ -90,7 +94,6 @@ class HParams:
         self.noise_size = 20
         self.disc_warmp_up = 500
         self.discriminator_type = 'linear'
-
 
         ################################
         # Optimization Hyperparameters #
