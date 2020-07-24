@@ -40,4 +40,4 @@ def log_validation(mel_loss, gate_loss, attn_loss, y, y_pred, input_lengths, out
     wandb.log(
         {"Validation mel loss": mel_loss, "Validation gate loss": gate_loss, "Validation attention loss": attn_loss,
          "Alignment": alignmentss, 'Mel spectrogram': mels, 'Gate': gates},
-        step=step, commit=True)
+        step=step)

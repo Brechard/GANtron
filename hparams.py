@@ -24,7 +24,7 @@ class HParams:
                               'decoder.attention_layer.memory_layer.linear_layer.weight',
                               'decoder.decoder_rnn.weight_ih', 'decoder.linear_projection.linear_layer.weight',
                               'decoder.gate_layer.linear_layer.weight']
-        self.attn_steps = 30000
+        self.attn_steps = 5000
         self.reduce_lr_steps_every = 5e4
 
         ################################
