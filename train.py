@@ -485,7 +485,7 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    wandb.init(project="Compare", config=hparams.__dict__, name=name)
+    wandb.init(project="Compare", config=hparams.__dict__, name=name, notes=args.notes)
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
