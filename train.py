@@ -454,6 +454,7 @@ if __name__ == '__main__':
     parser.add_argument('--hparams', type=str, required=False, help='comma separated name=value pairs')
     parser.add_argument('--wavs_path', type=str, required=True, help='path to the wavs files')
     parser.add_argument('--resume', type=str, default='', help='ID of a run to resume')
+    parser.add_argument('--notes', type=str, default='', help='Notes to add to the run')
     parser.add_argument('--real', type=int, default=1, required=False, help='value of real mel for Wasserstein loss')
     parser.add_argument('--attn_steps', type=int, required=False, help='Use attention loss for the first steps only')
 
@@ -483,7 +484,7 @@ if __name__ == '__main__':
     if args.resume != '':
         wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
     else:
-        wandb.init(project="GANtron", config=hparams.__dict__, name=name)
+        wandb.init(project="GANtron", config=hparams.__dict__, name=name, notes=args.notes)
     wandb.save("*.pt")
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
