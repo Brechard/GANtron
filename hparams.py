@@ -110,7 +110,10 @@ class HParams:
         if hparams_string:
             for param in hparams_string.split(','):
                 key, value = param.split('=')
-                self.add_param(key, ast.literal_eval(value))
+                if '/' in value:
+                    self.add_param(key, value)
+                else:
+                    self.add_param(key, ast.literal_eval(value))
 
     def add_param(self, param, value):
         self.__setattr__(param, value)
