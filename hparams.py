@@ -36,8 +36,8 @@ class HParams:
         # Data Parameters             #
         ################################
         self.load_mel_from_disk = False
-        self.training_files = 'filelists/ljs_audio_text_train_filelist.txt'
-        self.validation_files = 'filelists/ljs_audio_text_val_filelist.txt'
+        self.training_files = ['filelists/ljs_audio_text_train_filelist.txt', 'filelists/vesus_train.txt']
+        self.validation_files = ['filelists/ljs_audio_text_val_filelist.txt', 'filelists/vesus_val.txt']
         self.text_cleaners = ['english_cleaners']
 
         ################################

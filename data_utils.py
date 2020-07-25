@@ -17,15 +17,45 @@ class TextMelLoader(torch.utils.data.Dataset):
     """
 
     def __init__(self, audiopaths_and_text, hparams, wavs_path):
-        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text, wavs_path)
+        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text[0], wavs_path)
 
         self.vesus = False
         if hparams.vesus_path:
             self.vesus = True
-            audiopaths_and_text, speakers, emotions = load_vesus(hparams.vesus_path)
+            audiopaths_and_text, speakers, emotions = load_vesus(audiopaths_and_text[1], hparams.vesus_path)
             self.speakers = torch.IntTensor([0] * len(self.audiopaths_and_text) + speakers)
             self.emotions = torch.FloatTensor([[0, 0, 0, 0, 0]] * len(self.audiopaths_and_text) + emotions)
             self.audiopaths_and_text.extend(audiopaths_and_text)
+            # ids = list(range(len(audiopaths_and_text)))
+            # from random import shuffle
+            # shuffle(ids)
+            # shuffle(ids)
+            # shuffle(ids)
+            # text_train = ''
+            # for pos in ids[:-250]:
+            #     text_train += '/'.join(audiopaths_and_text[pos][0].split('/')[-3:])
+            #     text_train += '|' + audiopaths_and_text[pos][1]
+            #     text_train += '|' + str(speakers[pos])
+            #     text_train += '|' + str(emotions[pos])[1:-1] + '\n'
+            # with open('filelists/vesus_train.txt', 'w', encoding='UTF-8') as file:
+            #     file.write(text_train)
+            # text_val = ''
+            # for pos in ids[-250:-200]:
+            #     text_val += '/'.join(audiopaths_and_text[pos][0].split('/')[-3:])
+            #     text_val += '|' + audiopaths_and_text[pos][1]
+            #     text_val += '|' + str(speakers[pos])
+            #     text_val += '|' + str(emotions[pos])[1:-1] + '\n'
+            # with open('filelists/vesus_val.txt', 'w', encoding='UTF-8') as file:
+            #     file.write(text_val)
+            # text_test = ''
+            # for pos in ids[-200:]:
+            #     text_test += '/'.join(audiopaths_and_text[pos][0].split('/')[-3:])
+            #     text_test += '|' + audiopaths_and_text[pos][1]
+            #     text_test += '|' + str(speakers[pos])
+            #     text_test += '|' + str(emotions[pos])[1:-1] + '\n'
+            # with open('filelists/vesus_test.txt', 'w', encoding='UTF-8') as file:
+            #     file.write(text_test)
+
 
         self.text_cleaners = hparams.text_cleaners
         self.max_wav_value = hparams.max_wav_value
@@ -41,10 +71,10 @@ class TextMelLoader(torch.utils.data.Dataset):
 
     def get_mel_text_pair(self, audiopath_and_text):
         # separate filename and text
-        audiopath, text = audiopath_and_text[0], audiopath_and_text[1]
-        text = self.get_text(text)
+        audiopath, utterance = audiopath_and_text[0], audiopath_and_text[1]
+        text = self.get_text(utterance)
         mel = self.get_mel(audiopath)
-        return text, mel
+        return utterance, text, mel
 
     def get_mel(self, filename):
         if not self.load_mel_from_disk:
@@ -67,11 +97,11 @@ class TextMelLoader(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         idx = self.idx[index]
-        text, mel = self.get_mel_text_pair(self.audiopaths_and_text[idx])
+        utterance, text, mel = self.get_mel_text_pair(self.audiopaths_and_text[idx])
         if self.vesus:
-            return text, mel, self.speakers[idx], self.emotions[idx]
+            return utterance, text, mel, self.speakers[idx], self.emotions[idx]
 
-        return text, mel
+        return utterance, text, mel
 
     def __len__(self):
         return len(self.audiopaths_and_text)
@@ -91,24 +121,25 @@ class TextMelCollate():
         """
         # Right zero-pad all one-hot text sequences to max input length
         input_lengths, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([len(x[0]) for x in batch]),
+            torch.LongTensor([len(x[1]) for x in batch]),
             dim=0, descending=True)
         max_input_len = input_lengths[0]
-
+        utterances = []
         text_padded = torch.LongTensor(len(batch), max_input_len)
         text_padded.zero_()
         speaker_ids = torch.FloatTensor(len(batch))
         emotions = torch.FloatTensor(len(batch), 5)
         for i in range(len(ids_sorted_decreasing)):
-            text = batch[ids_sorted_decreasing[i]][0]
+            utterances.append(batch[ids_sorted_decreasing[i]][0])
+            text = batch[ids_sorted_decreasing[i]][1]
             text_padded[i, :text.size(0)] = text
             if len(batch[0]) == 4:
                 speaker_ids[i] = batch[ids_sorted_decreasing[i]][-2]
                 emotions[i] = batch[ids_sorted_decreasing[i]][-1]
 
         # Right zero-pad mel-spec
-        num_mels = batch[0][1].size(0)
-        max_target_len = max([x[1].size(1) for x in batch])
+        num_mels = batch[0][2].size(0)
+        max_target_len = max([x[2].size(1) for x in batch])
         if max_target_len % self.n_frames_per_step != 0:
             max_target_len += self.n_frames_per_step - max_target_len % self.n_frames_per_step
             assert max_target_len % self.n_frames_per_step == 0
@@ -120,10 +151,10 @@ class TextMelCollate():
         gate_padded.zero_()
         output_lengths = torch.LongTensor(len(batch))
         for i in range(len(ids_sorted_decreasing)):
-            mel = batch[ids_sorted_decreasing[i]][1]
+            mel = batch[ids_sorted_decreasing[i]][2]
             mel_padded[i, :, :mel.size(1)] = mel
             gate_padded[i, mel.size(1) - 1:] = 1
             output_lengths[i] = mel.size(1)
 
-        return text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, \
+        return utterances, text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, \
                output_lengths

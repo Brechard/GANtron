@@ -180,7 +180,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
         for i, batch in enumerate(val_loader):
             x, y = model.parse_batch(batch)
             y_pred = model(x)
-            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[1], x[4])
+            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[2], x[5])
             if distributed_run:
                 reduced_mel_val_loss = reduce_tensor(mel_loss.data, n_gpus).item()
                 reduced_gate_val_loss = reduce_tensor(gate_loss.data, n_gpus).item()
@@ -192,7 +192,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
             val_mel_loss += reduced_mel_val_loss
             val_gate_loss += reduced_gate_val_loss
             val_attn_loss += reduced_attn_val_loss
-            input_lengths, output_lengths = x[1], x[-1]
+            input_lengths, output_lengths = x[2], x[-1]
         val_mel_loss = val_mel_loss / (i + 1)
         val_gate_loss = val_gate_loss / (i + 1)
         val_attn_loss = val_attn_loss / (i + 1)
@@ -204,7 +204,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
         logger.log_validation(val_mel_loss, val_gate_loss, val_attn_loss, y, y_pred, input_lengths, output_lengths,
-                              iteration)
+                              iteration, args.waveglow_path, x[0])
     return val_mel_loss + val_gate_loss
 
 
@@ -303,7 +303,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
                 discriminator.zero_grad()
                 x, y = generator.parse_batch(batch)
-                real_mel, output_lengths = x[2], x[-1]
+                real_mel, output_lengths = x[3], x[-1]
                 # how well can it label as real?
                 real_loss = real * discriminator.adversarial_loss(real_mel, output_lengths)
 
@@ -371,7 +371,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 if len(generated_mel_list) > hparams.d_freq:
                     generated_mel_list.pop(0)
 
-                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[-1])
+                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[2], x[-1])
                 taco_loss = mel_loss + gate_loss
                 adv_loss = 0
                 if hparams.d_freq > 0:
@@ -450,6 +450,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
     parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
+    parser.add_argument('--waveglow_path', type=str, default=None, required=False, help='WaveGlow path to use in validation')
     parser.add_argument('--vesus_path', type=str, default=None, help='Vesus dataset path to use')
     parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
@@ -473,6 +474,10 @@ if __name__ == '__main__':
            f"{'labels' if hparams.use_labels else 'NOlabels'}" \
 
     print('\033[94m', f'Run {name} started', '\033[0m')
+    if args.waveglow_path:
+        import sys
+        sys.path.append('WaveGlow/')
+
     real = 1
     fake = - real
 

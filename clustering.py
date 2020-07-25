@@ -15,7 +15,7 @@ import layers
 from hparams import HParams
 from utils import load_wav_to_torch
 
-sys.path.append('waveglow/')
+sys.path.append('WaveGlow/')
 
 
 # base_path = 'C:/Users/rodri/PycharmProjects/GANtron/test1/'
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         waveglow.cuda().eval().half()
         for k in waveglow.convinv:
             k.float()
-        progress_bar = tqdm(enumerate(kmeans.cluster_centers_))
+        progress_bar = tqdm(enumerate(kmeans.cluster_centers_), total=args.clusters)
         progress_bar.set_description('Generating centroids wav files')
         for i, centroid in progress_bar:
             mel = centroid.reshape(n_mel_channels, -1)

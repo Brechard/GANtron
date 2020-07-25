@@ -2,9 +2,10 @@ import argparse
 import sys
 
 from tqdm import tqdm
-
+import os
 # matplotlib.use('GTK3')
-sys.path.append('waveglow/')
+sys.path.append('WaveGlow/')
+
 import numpy as np
 import torch
 
@@ -50,6 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--samples', type=int, default=200, help='Number of samples to generate')
 
     args = parser.parse_args()
+    args.generate_audio = True
 
     os.makedirs(args.output_path, exist_ok=True)
 
