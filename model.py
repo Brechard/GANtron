@@ -587,7 +587,7 @@ class Tacotron2(nn.Module):
         self.postnet = Postnet(hparams)
 
     def parse_batch(self, batch):
-        text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, output_lengths = batch
+        utterances, text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, output_lengths = batch
         text_padded = to_gpu(text_padded).long()
         input_lengths = to_gpu(input_lengths).long()
         speaker_ids = to_gpu(speaker_ids).long()
@@ -598,7 +598,7 @@ class Tacotron2(nn.Module):
         output_lengths = to_gpu(output_lengths).long()
 
         return (
-            (text_padded, input_lengths, mel_padded, max_len, speaker_ids, emotions, output_lengths),
+            (utterances, text_padded, input_lengths, mel_padded, max_len, speaker_ids, emotions, output_lengths),
             (mel_padded, gate_padded))
 
     def parse_output(self, outputs, output_lengths=None):
@@ -614,7 +614,7 @@ class Tacotron2(nn.Module):
         return outputs
 
     def forward(self, inputs):
-        text_inputs, text_lengths, mels, max_len, speaker_ids, emotions, output_lengths = inputs
+        _, text_inputs, text_lengths, mels, max_len, speaker_ids, emotions, output_lengths = inputs
         text_lengths, output_lengths = text_lengths.data, output_lengths.data
 
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)

@@ -180,7 +180,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
         for i, batch in enumerate(val_loader):
             x, y = model.parse_batch(batch)
             y_pred = model(x)
-            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[1], x[4])
+            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[2], x[5])
             if distributed_run:
                 reduced_mel_val_loss = reduce_tensor(mel_loss.data, n_gpus).item()
                 reduced_gate_val_loss = reduce_tensor(gate_loss.data, n_gpus).item()
@@ -192,7 +192,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
             val_mel_loss += reduced_mel_val_loss
             val_gate_loss += reduced_gate_val_loss
             val_attn_loss += reduced_attn_val_loss
-            input_lengths, output_lengths = x[1], x[-1]
+            input_lengths, output_lengths = x[2], x[-1]
         val_mel_loss = val_mel_loss / (i + 1)
         val_gate_loss = val_gate_loss / (i + 1)
         val_attn_loss = val_attn_loss / (i + 1)
@@ -303,7 +303,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
                 discriminator.zero_grad()
                 x, y = generator.parse_batch(batch)
-                real_mel, output_lengths = x[2], x[-1]
+                real_mel, output_lengths = x[3], x[-1]
                 # how well can it label as real?
                 real_loss = real * discriminator.adversarial_loss(real_mel, output_lengths)
 
@@ -371,7 +371,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 if len(generated_mel_list) > hparams.d_freq:
                     generated_mel_list.pop(0)
 
-                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[-1])
+                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[2], x[-1])
                 taco_loss = mel_loss + gate_loss
                 adv_loss = 0
                 if hparams.d_freq > 0:
