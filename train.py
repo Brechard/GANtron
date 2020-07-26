@@ -204,7 +204,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
         logger.log_validation(val_mel_loss, val_gate_loss, val_attn_loss, y, y_pred, input_lengths, output_lengths,
-                              iteration)
+                              iteration, args.waveglow_path)
     return val_mel_loss + val_gate_loss
 
 
@@ -450,6 +450,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
     parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
+    parser.add_argument('--waveglow_path', type=str, default=None, required=False, help='WaveGlow path to use in validation')
     parser.add_argument('--vesus_path', type=str, default=None, help='Vesus dataset path to use')
     parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
@@ -473,6 +474,10 @@ if __name__ == '__main__':
            f"{'labels' if hparams.use_labels else 'NOlabels'}" \
 
     print('\033[94m', f'Run {name} started', '\033[0m')
+    if args.waveglow_path:
+        import sys
+        sys.path.append('WaveGlow/')
+
     real = 1
     fake = - real
 
@@ -491,4 +496,5 @@ if __name__ == '__main__':
 
     train(args.output_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)
+
 # --waveglow_path waveglow_256channels_universal_v5.pt
