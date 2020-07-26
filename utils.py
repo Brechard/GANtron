@@ -21,6 +21,8 @@ def get_mask_from_lengths(lengths):
 
 def load_wav_to_torch(full_path, sampling_rate):
     data, _ = load(full_path, sampling_rate)
+    if abs(data.min()) > 1 or abs(data.max()) > 1:
+        data = data / max(abs(data.min()), abs(data.max()))
     return torch.FloatTensor(data.astype(np.float32))
 
 
@@ -58,7 +60,19 @@ def calculate_emotions(labeled_emotions, labeled_intensities):
     return emotions
 
 
-def load_vesus(vesus_path):
+def load_vesus(filename, wavs_path, split="|"):
+    speakers, emotions = [], []
+    with open(filename, encoding='utf-8') as f:
+        filepaths_and_text = []
+        for line in f:
+            l = line.strip().split(split)
+            filepaths_and_text.append([wavs_path + l[0]] + [l[1]])
+            speakers.append(int(l[2]))
+            emotions.append([float(i) for i in l[3].split(',')])
+    return filepaths_and_text, speakers, emotions
+
+
+def load_vesus_full(vesus_path):
     utterances, speakers, emotions, paths = [], [], [], []
 
     labels = pd.read_csv(vesus_path + '/Tools/VESUS_Key.csv', header=0)

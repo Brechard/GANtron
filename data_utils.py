@@ -17,12 +17,12 @@ class TextMelLoader(torch.utils.data.Dataset):
     """
 
     def __init__(self, audiopaths_and_text, hparams, wavs_path):
-        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text, wavs_path)
+        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text[0], wavs_path)
 
         self.vesus = False
         if hparams.vesus_path:
             self.vesus = True
-            audiopaths_and_text, speakers, emotions = load_vesus(hparams.vesus_path)
+            audiopaths_and_text, speakers, emotions = load_vesus(audiopaths_and_text[1], hparams.vesus_path)
             self.speakers = torch.IntTensor([0] * len(self.audiopaths_and_text) + speakers)
             self.emotions = torch.FloatTensor([[0, 0, 0, 0, 0]] * len(self.audiopaths_and_text) + emotions)
             self.audiopaths_and_text.extend(audiopaths_and_text)

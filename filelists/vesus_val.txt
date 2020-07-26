@@ -1,0 +1,50 @@
+6/Fearful/172.wav|Five thousand two|6|0.72, 0, 0.02, 0.06, 0
+7/Angry/5.wav|Orange|7|0.22, 0.6, 0, 0, 0
+6/Fearful/50.wav|People arrive late|6|0.48, 0, 0, 0.12, 0.06
+10/Angry/58.wav|Elliot walks briskly|10|0, 0.9, 0, 0, 0
+1/Sad/203.wav|Second of march|1|0.08, 0, 0, 0.54, 0.22
+4/Sad/96.wav|Eric phoned boss|4|0.86, 0.06, 0, 0, 0
+8/Happy/103.wav|Carl filled form|8|0.44, 0, 0.04, 0.22, 0
+8/Happy/67.wav|Leslie called home|8|0.28, 0, 0, 0.54, 0
+6/Sad/10.wav|White|6|0.72, 0, 0, 0.1, 0
+8/Happy/178.wav|Five million seven|8|0.6, 0, 0.16, 0, 0
+9/Fearful/160.wav|Boulders are big|9|0.1, 0, 0, 0.2, 0.62
+5/Sad/203.wav|Second of march|5|0, 0, 0, 0.5, 0.28
+1/Happy/15.wav|Teal|1|0.44, 0, 0.08, 0.08, 0.12
+5/Neutral/166.wav|Deserts are dry|5|0.5, 0, 0.1, 0.14, 0.1
+7/Sad/196.wav|February fifteenth|7|0.18, 0, 0.14, 0.44, 0.08
+8/Happy/196.wav|February fifteenth|8|0.72, 0, 0.08, 0, 0.02
+3/Fearful/113.wav|Rick rakes leaves|3|0.56, 0, 0, 0.3, 0
+1/Neutral/252.wav|What was that|1|0.86, 0, 0, 0.1, 0
+8/Angry/192.wav|April twenty-third|8|0.58, 0.1, 0.2, 0, 0
+5/Sad/32.wav|Boulders|5|0.18, 0, 0, 0.62, 0.1
+5/Neutral/37.wav|Ponds|5|0.72, 0.08, 0, 0.06, 0
+1/Fearful/219.wav|The sunlight is yellow|1|0, 0, 0.28, 0.18, 0.22
+10/Angry/194.wav|June twenty-eighth|10|0, 0.62, 0.2, 0, 0
+7/Sad/100.wav|I consider reviews|7|0.44, 0, 0, 0.42, 0
+4/Neutral/58.wav|Elliot walks briskly|4|0.72, 0.14, 0, 0, 0
+10/Fearful/247.wav|I am sad|10|0, 0, 0, 0.92, 0
+3/Neutral/161.wav|Oceans are deep|3|0.82, 0, 0, 0.02, 0
+7/Neutral/181.wav|Twelve million eight|7|0.34, 0.46, 0, 0, 0
+4/Angry/222.wav|Her carrot is orange|4|0.74, 0.12, 0, 0, 0
+10/Sad/31.wav|Rivers|10|0, 0.06, 0, 0.7, 0.08
+5/Happy/36.wav|Lakes|5|0.38, 0, 0.28, 0, 0.08
+7/Angry/149.wav|The horse won a race|7|0, 1.0, 0, 0, 0
+1/Angry/26.wav|Three|1|0, 0.78, 0, 0, 0.04
+9/Fearful/4.wav|Red|9|0.48, 0.06, 0, 0.2, 0
+1/Fearful/198.wav|Tenth of september|1|0.1, 0.42, 0, 0, 0.12
+3/Angry/163.wav|Ponds are small|3|0, 0.34, 0.1, 0.32, 0
+5/Happy/172.wav|Five thousand two|5|0.62, 0.04, 0.1, 0, 0
+5/Happy/27.wav|Twelve|5|0.46, 0, 0.22, 0, 0
+4/Fearful/183.wav|Thirteen million one|4|0.06, 0, 0, 0.06, 0.62
+1/Neutral/57.wav|Mike travels far|1|0.92, 0, 0, 0, 0
+1/Angry/38.wav|Creeks|1|0.1, 0.74, 0, 0, 0
+10/Fearful/242.wav|I was promoted|10|0, 0, 0.1, 0.52, 0.18
+2/Fearful/107.wav|Sarah took notes|2|0.08, 0.2, 0, 0.1, 0.44
+10/Sad/11.wav|Gray|10|0.28, 0, 0, 0.5800000000000001, 0
+2/Neutral/108.wav|Dylan sends mail|2|0.42, 0.3, 0, 0, 0.08
+10/Sad/235.wav|Don’t talk back|10|0.18, 0.08, 0, 0.5, 0.08
+10/Happy/174.wav|Eight thousand five|10|0, 0.14, 0.64, 0, 0.04
+10/Neutral/73.wav|Lee made collage|10|0.62, 0.08, 0, 0.08, 0
+4/Fearful/44.wav|Deserts|4|0.34, 0.14, 0.04, 0.16, 0.08
+9/Sad/151.wav|A monkey traverses the canopy|9|0.08, 0, 0, 0.8, 0
