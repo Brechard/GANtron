@@ -95,6 +95,7 @@ class HParams:
         self.noise_size = 20
         self.disc_warmp_up = 500
         self.discriminator_type = 'linear'
+        self.encoder_emotions = False
 
         ################################
         # Optimization Hyperparameters #

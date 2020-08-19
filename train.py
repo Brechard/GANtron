@@ -469,8 +469,9 @@ if __name__ == '__main__':
     if not hparams.use_noise:
         hparams.noise_size = 0
 
-    name = f"{hparams.noise_size}n-" \
-           f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
+    name = f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
+           f"{'encL-' if hparams.encoder_emotions else ''}" \
+           f"{hparams.noise_size}n-" \
            f"{'labels' if hparams.use_labels else 'NOlabels'}" \
 
     print('\033[94m', f'Run {name} started', '\033[0m')
