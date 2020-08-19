@@ -4,7 +4,7 @@ import sys
 from tqdm import tqdm
 
 # matplotlib.use('GTK3')
-sys.path.append('waveglow/')
+sys.path.append('WaveGlow/')
 import numpy as np
 import torch
 
@@ -75,4 +75,4 @@ if __name__ == '__main__':
             audio = generate_audio(waveglow, mel_outputs_postnet)
             sf.write(f'{args.output_path}/{i}.wav', audio[0].to(torch.float32).data.cpu().numpy(), 22050)
         else:
-            np.save(f'{args.output_path}/{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+            np.save(f'{args.output_path}/{1000 + i}.npy', mel_outputs_postnet[0].data.cpu().numpy())

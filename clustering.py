@@ -15,7 +15,7 @@ import layers
 from hparams import HParams
 from utils import load_wav_to_torch
 
-sys.path.append('waveglow/')
+sys.path.append('WaveGlow/')
 
 
 # base_path = 'C:/Users/rodri/PycharmProjects/GANtron/test1/'
