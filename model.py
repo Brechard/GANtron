@@ -651,9 +651,20 @@ class Tacotron2(nn.Module):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
             output_lengths)
 
-    def inference(self, text_inputs, style=None):
+    def inference(self, text_inputs, style=None, emotions=None, encoder_emotions=False, speaker=None):
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
         encoder_outputs = self.encoder.inference(embedded_inputs)
+
+        if speaker is not None:
+            embedded_speaker = self.speaker_embedding(speaker)[:, None]
+            # Repeat the speaker and emotion for each part of the embedded text for the attention mechanism
+            embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
+            encoder_outputs = torch.cat((encoder_outputs, embedded_speaker), dim=2)
+
+        if emotions is not None and not encoder_emotions:
+            emotions = emotions[:, None].repeat(1, encoder_outputs.size(1), 1)
+            encoder_outputs = torch.cat((encoder_outputs, emotions), dim=2)
+
         mel_outputs, gate_outputs, alignments = self.decoder.inference(
             encoder_outputs, style)
 
