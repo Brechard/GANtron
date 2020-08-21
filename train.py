@@ -472,6 +472,7 @@ if __name__ == '__main__':
     name = f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
            f"{'encL-' if hparams.encoder_emotions else ''}" \
            f"{hparams.noise_size}n-" \
+           f"{'intended' if hparams.use_intended_labels and hparams.use_labels else ''}" \
            f"{'labels' if hparams.use_labels else 'NOlabels'}" \
 
     print('\033[94m', f'Run {name} started', '\033[0m')

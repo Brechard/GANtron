@@ -22,7 +22,8 @@ class TextMelLoader(torch.utils.data.Dataset):
         self.vesus = False
         if hparams.vesus_path:
             self.vesus = True
-            audiopaths_and_text, speakers, emotions = load_vesus(audiopaths_and_text[1], hparams.vesus_path)
+            audiopaths_and_text, speakers, emotions = load_vesus(audiopaths_and_text[1], hparams.vesus_path,
+                                                                 use_intended_labels=hparams.use_intended_labels)
             self.speakers = torch.IntTensor([0] * len(self.audiopaths_and_text) + speakers)
             self.emotions = torch.FloatTensor([[0, 0, 0, 0, 0]] * len(self.audiopaths_and_text) + emotions)
             self.audiopaths_and_text.extend(audiopaths_and_text)

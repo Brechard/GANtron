@@ -30,7 +30,7 @@ class HParams:
         self.speakers_embedding = 64
         self.use_labels = True
         self.use_noise = False
-        self.attention_with = 0.5
+        self.use_intended_labels = True
 
         ################################
         # Data Parameters             #
