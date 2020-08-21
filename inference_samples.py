@@ -1,18 +1,18 @@
 import argparse
+import os
 import sys
 
+# matplotlib.use('GTK3')
+import numpy as np
+import soundfile as sf
+import torch
 from tqdm import tqdm
 
-# matplotlib.use('GTK3')
-sys.path.append('WaveGlow/')
-import numpy as np
-import torch
-
 from hparams import HParams
-from train import load_model
 from text import text_to_sequence
-import soundfile as sf
-import os
+from train import load_model
+
+sys.path.append('WaveGlow/')
 
 
 def load_GANtron(path):
