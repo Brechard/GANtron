@@ -469,6 +469,9 @@ if __name__ == '__main__':
     if not hparams.use_noise:
         hparams.noise_size = 0
 
+    if hparams.d_freq == 0:
+        hparams.disc_warmp_up = 0
+
     name = f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
            f"{'encL-' if hparams.encoder_emotions else ''}" \
            f"{hparams.noise_size}n-" \
