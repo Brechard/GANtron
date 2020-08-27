@@ -75,14 +75,19 @@ class Classifier(torch.nn.Module):
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
         self.model = torch.nn.Sequential(
-            module(n_mel_channels * n_frames, 256),
+            module(n_mel_channels * n_frames, 1024),
+            module(1024, 512),
+            module(512, 256),
             module(256, 128),
             module(128, 64),
             module(64, n_emotions)
         )
 
     def forward(self, x, smallest_length):
-        start = np.random.randint(0, smallest_length - self.n_frames)
+        if smallest_length - self.n_frames > 0:
+            start = np.random.randint(0, smallest_length - self.n_frames)
+        else:
+            start = 0
         x = x[:, :, start:start + self.n_frames].reshape(x.size(0), -1)
         return self.model(x)
 
@@ -181,10 +186,10 @@ if __name__ == '__main__':
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=8,
+    parser.add_argument('--batch_size', type=int, default=16,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
+    parser.add_argument('--n_frames', type=int, default=150, help='Number of frames to use for classification')
     # dryrun
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
