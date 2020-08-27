@@ -78,7 +78,7 @@ def calculate_emotions(labeled_emotions, labeled_intensities):
     return emotions
 
 
-def load_vesus(filename, wavs_path, split="|", use_intended_labels=False):
+def load_vesus(filename, wavs_path, split="|", use_intended_labels=False, use_text=True):
     speakers, emotions = [], []
     vesus_ids = {
         "Neutral": [1, 0, 0, 0, 0],
@@ -91,7 +91,10 @@ def load_vesus(filename, wavs_path, split="|", use_intended_labels=False):
         filepaths_and_text = []
         for line in f:
             l = line.strip().split(split)
-            filepaths_and_text.append([wavs_path + l[0]] + [l[1]])
+            filepath = wavs_path + l[0]
+            if use_text:
+                filepath = [filepath, l[1]]
+            filepaths_and_text.append(filepath)
             speakers.append(int(l[2]))
             if use_intended_labels:
                 emotions.append(vesus_ids[l[0].split('/')[1]])
