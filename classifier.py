@@ -168,8 +168,8 @@ def val_epoch(model, val_loader):
     model.eval()
     with torch.no_grad():
         for batch in val_loader:
-            x, y = batch
-            y_pred = model(x).squeeze(-1)
+            x, smallest_length, y = batch
+            y_pred = model(x, smallest_length).squeeze(-1)
             loss = torch.nn.MSELoss()(y, y_pred)
             wandb.log({'Validation Loss': loss})
 
