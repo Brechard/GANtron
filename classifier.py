@@ -66,7 +66,7 @@ class MelLoaderCollate:
             mel_padded[i, :, :mel.size(1)] = mel
             emotions[i] = batch[ids_sorted_decreasing[i]][1]
 
-        return mel_padded.cuda(non_blocking=True), emotions.cuda(non_blocking=True)
+        return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
 
 
 class Classifier(torch.nn.Module):
@@ -81,8 +81,8 @@ class Classifier(torch.nn.Module):
             module(64, n_emotions)
         )
 
-    def forward(self, x):
-        start = np.random.randint(0, x.size(-1) - self.n_frames)
+    def forward(self, x, smallest_length):
+        start = np.random.randint(0, smallest_length - self.n_frames)
         x = x[:, :, start:start + self.n_frames].reshape(x.size(0), -1)
         return self.model(x)
 
@@ -155,8 +155,8 @@ def train_epoch(epoch, model, optimizer, train_loader):
     model.train()
     for i, batch in progress_bar:
         model.zero_grad()
-        x, y = batch
-        y_pred = model(x).squeeze(-1)
+        x, smallest_length, y = batch
+        y_pred = model(x, smallest_length).squeeze(-1)
         loss = torch.nn.MSELoss()(y, y_pred)
         progress_bar.set_description(f'Epoch {epoch + 1}/epochs. Iter {i}/{len(train_loader)}. Loss = {loss}')
         wandb.log({'Train Loss': loss})
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=16, help='Number of epochs to train')
+    parser.add_argument('--batch_size', type=int, default=8, help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
     # dryrun
