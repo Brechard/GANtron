@@ -39,10 +39,52 @@ def generate_audio(waveglow, mel_spectrogram):
     return audio
 
 
+def force_style_emotions(style_shape, n_styles=6, n_samples_styles=20):
+    emotions = None
+    if hparams.use_labels:
+        emotions = [
+                            # [Neutral, Angry, Happy, Sad, Fearful]
+                       torch.FloatTensor([[0.6, 0, 0, 0, 0]]).cuda(),
+                       torch.FloatTensor([[0, 0.7, 0, 0, 0]]).cuda(),
+                       torch.FloatTensor([[0, 0, 0.5, 0, 0]]).cuda(),
+                       torch.FloatTensor([[0, 0, 0, 0.8, 0]]).cuda(),
+                       torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
+                   ] + [torch.rand(1, 5).cuda() for i in range(n_styles - 3)]
+    styles = [
+                 torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
+                 torch.ones(1, style_shape[0], style_shape[1]).cuda() * 0.5,
+                 torch.ones(1, style_shape[0], style_shape[1]).cuda(),
+             ] + [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
+                  range(n_styles - 3)]
+    for st in tqdm(range(n_styles)):
+        for i in range(n_samples_styles):
+            mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(sequence, styles[st],
+                                                                                emotions=emotions[st], speaker=speaker)
+            np.save(f'{args.output_path}/{st}-{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+
+
+def random_style():
+    for i in tqdm(range(args.samples)):
+        style = torch.rand(1, 1, hparams.noise_size)
+        style = style.repeat_interleave(sequence.size(1), dim=1).cuda()
+        emotions = None
+        if hparams.use_labels:
+            emotions = torch.rand(1, 5).cuda()
+
+        mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(sequence, style, emotions=emotions,
+                                                                            speaker=speaker)
+        if waveglow is not None:
+            audio = generate_audio(waveglow, mel_outputs_postnet)
+            sf.write(f'{args.output_path}/{i}.wav', audio[0].to(torch.float32).data.cpu().numpy(), 22050)
+        else:
+            np.save(f'{args.output_path}/{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--checkpoint_path', type=str, required=True, help='GANtron checkpoint path')
     parser.add_argument('--generate_audio', action='store_true', help='Generate the audio files')
+    parser.add_argument('--force_style', action='store_true', help='Generate with forced styles')
     parser.add_argument('-w', '--waveglow_path', type=str, required=False, help='waveglow checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Model name to save the ')
     parser.add_argument('--samples', type=int, default=200, help='Number of samples to generate')
@@ -63,17 +105,7 @@ if __name__ == '__main__':
     sequence = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
     speaker = None if args.hparams is None else torch.LongTensor([args.speaker]).cuda()
 
-    for i in tqdm(range(args.samples)):
-        style = torch.rand(1, 1, hparams.noise_size)
-        style = style.repeat_interleave(sequence.size(1), dim=1).cuda()
-        emotions = None
-        if hparams.use_labels:
-            emotions = torch.rand(1, 5).cuda()
-
-        mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(sequence, style, emotions=emotions,
-                                                                            speaker=speaker)
-        if waveglow is not None:
-            audio = generate_audio(waveglow, mel_outputs_postnet)
-            sf.write(f'{args.output_path}/{i}.wav', audio[0].to(torch.float32).data.cpu().numpy(), 22050)
-        else:
-            np.save(f'{args.output_path}/{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+    if args.force_style:
+        force_style_emotions([sequence.size(1), hparams.noise_size])
+    else:
+        random_style()
