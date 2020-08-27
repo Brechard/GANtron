@@ -151,11 +151,11 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
     model = Classifier(hparams.n_mel_channels, n_frames, 5).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=hparams.weight_decay)
     for epoch in range(epochs):
-        train_epoch(epoch, model, optimizer, train_loader)
+        train_epoch(epoch, epochs, model, optimizer, train_loader)
         val_epoch(model, val_loader)
 
 
-def train_epoch(epoch, model, optimizer, train_loader):
+def train_epoch(epoch, epochs, model, optimizer, train_loader):
     progress_bar = tqdm(enumerate(train_loader), total=len(train_loader))
     model.train()
     for i, batch in progress_bar:
@@ -163,7 +163,7 @@ def train_epoch(epoch, model, optimizer, train_loader):
         x, smallest_length, y = batch
         y_pred = model(x, smallest_length).squeeze(-1)
         loss = torch.nn.MSELoss()(y, y_pred)
-        progress_bar.set_description(f'Epoch {epoch + 1}/epochs. Iter {i}/{len(train_loader)}. Loss = {loss}')
+        progress_bar.set_description(f'Epoch {epoch + 1}/{epochs}. Iter {i}/{len(train_loader)}. Loss = {loss}')
         wandb.log({'Train Loss': loss})
         loss.backward()
         optimizer.step()
