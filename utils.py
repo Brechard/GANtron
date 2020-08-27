@@ -1,7 +1,12 @@
+import os
+
 import numpy as np
 import pandas as pd
 import torch
 from librosa import load
+
+import layers
+from hparams import HParams
 
 emo_id_to_text = {
     0: 'Neutral',
@@ -19,11 +24,24 @@ def get_mask_from_lengths(lengths):
     return mask
 
 
-def load_wav_to_torch(full_path, sampling_rate):
+def load_wav_to_torch(full_path, sampling_rate=22050):
     data, _ = load(full_path, sampling_rate)
     if abs(data.min()) > 1 or abs(data.max()) > 1:
         data = data / max(abs(data.min()), abs(data.max()))
     return torch.FloatTensor(data.astype(np.float32))
+
+
+def get_mel_from_audio(path):
+    hparams = HParams()
+    n_mel_channels = hparams.n_mel_channels
+    stft = layers.TacotronSTFT(hparams.filter_length, hparams.hop_length, hparams.win_length,
+                               n_mel_channels, hparams.sampling_rate, hparams.mel_fmin,
+                               hparams.mel_fmax)
+    audio = load_wav_to_torch(path)
+    audio_norm = audio / hparams.max_wav_value
+    audio_norm = audio_norm.unsqueeze(0)
+    audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
+    return stft.mel_spectrogram(audio_norm)[0].numpy()
 
 
 def load_filepaths_and_text(filename, wavs_path, split="|"):
@@ -107,3 +125,34 @@ def to_gpu(x):
     if torch.cuda.is_available():
         x = x.cuda(non_blocking=True)
     return torch.autograd.Variable(x)
+
+
+def mel_to_audio(base_path, waveglow_path, randomize=True, force_create=False):
+    from tqdm import tqdm
+    from soundfile import write
+    import sys
+    sys.path.append('WaveGlow/')
+    dir_list = os.listdir(base_path)
+    if randomize:
+        from random import shuffle
+        shuffle(dir_list)
+
+    for path in tqdm(dir_list):
+        if '.npy' not in path:
+            continue
+        full_path = f'{base_path}/{path.split(".")[0]}.wav'
+        if os.path.exists(full_path):
+            if not force_create:
+                print(f'File {full_path} already exists. Skip.')
+                continue
+            else:
+                print(f'File {full_path} already exists. Creating again.')
+
+        mel = np.load(base_path + path, allow_pickle=True)
+        waveglow = torch.load(waveglow_path)['model']
+        waveglow.cuda().eval().half()
+        for k in waveglow.convinv:
+            k.float()
+        with torch.no_grad():
+            audio = waveglow.infer(torch.FloatTensor(mel).unsqueeze(0).cuda().half(), sigma=0.666)
+            write(full_path, audio[0].to(torch.float32).data.cpu().numpy(), 22050)
