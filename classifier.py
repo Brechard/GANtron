@@ -181,11 +181,14 @@ if __name__ == '__main__':
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=8, help='Batch size, recommended to use a small one even if it is smaller.')
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
     # dryrun
     args = parser.parse_args()
-    wandb.init(project="Classifier", config=args)
+    name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
+           f'{"-intendedLabels" if args.use_intended_labels else ""}'
+    wandb.init(project="Classifier", config=args, name=name)
 
     train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames)
