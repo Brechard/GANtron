@@ -167,11 +167,13 @@ def train_epoch(epoch, model, optimizer, train_loader):
 def val_epoch(model, val_loader):
     model.eval()
     with torch.no_grad():
+        val_loss = 0
         for batch in val_loader:
             x, smallest_length, y = batch
             y_pred = model(x, smallest_length).squeeze(-1)
             loss = torch.nn.MSELoss()(y, y_pred)
-            wandb.log({'Validation Loss': loss})
+            val_loss += loss
+        wandb.log({'Validation Loss': val_loss / len(val_loader)})
 
 
 if __name__ == '__main__':
