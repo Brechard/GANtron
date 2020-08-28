@@ -235,13 +235,13 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
-    parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
+    parser.add_argument('--use_intended_labels', type=bool, default=True, help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=128,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=30, help='Number of frames to use for classification')
-    parser.add_argument('--linear_model', type=int, default=30, help='Number of frames to use for classification')
+    parser.add_argument('--linear_model', type=bool, default=False, help='Use linear model or convolutional')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
