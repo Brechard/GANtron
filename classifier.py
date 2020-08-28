@@ -12,6 +12,7 @@ import layers
 from hparams import HParams
 from utils import load_vesus
 from utils import load_wav_to_torch
+import matplotlib.pyplot as plt
 
 emotion_to_id = {
     'Neutral': 0,
@@ -25,8 +26,16 @@ emotion_to_id = {
 def module(size_in, size_out):
     return torch.nn.Sequential(
         torch.nn.Linear(size_in, size_out),
-        torch.nn.LayerNorm(size_out),
-        torch.nn.Dropout(0.5),
+        torch.nn.BatchNorm1d(size_out),
+        torch.nn.Dropout(0.2),
+        torch.nn.LeakyReLU(0.1)
+    )
+
+
+def conv_module(size_in, size_out):
+    return torch.nn.Sequential(
+        torch.nn.Conv1d(size_in, size_out, 5, padding=2),
+        torch.nn.Dropout(0.2),
         torch.nn.LeakyReLU(0.1)
     )
 
@@ -42,7 +51,15 @@ class MelLoader(torch.utils.data.Dataset):
         return torch.FloatTensor(np.load(path, allow_pickle=True))
 
     def __getitem__(self, index):
-        return self.get_mel(self.mel_paths[self.indexes[index]]), torch.FloatTensor(self.emotions[self.indexes[index]])
+        mel = self.get_mel(self.mel_paths[self.indexes[index]])
+        em = torch.FloatTensor(self.emotions[self.indexes[index]])
+        # fig, ax = plt.subplots(figsize=(6, 4))
+        # im = plt.imshow(mel.cpu().numpy(), origin='lower')
+        # plt.title(self.mel_paths[self.indexes[index]])
+        # fig.colorbar(im, ax=ax)
+        # plt.show()
+        # plt.imshow(librosa.feature.melspectrogram(librosa.load('C:/Users/rodri/Datasets/VESUS/Audio/1/Happy/100.wav')[0], sr=22050, n_fft=1024, n_mels=80, hop_length=256, win_length=1024), origin='lower'), plt.show()
+        return mel, em
 
     def __len__(self):
         return len(self.mel_paths)
@@ -70,25 +87,42 @@ class MelLoaderCollate:
 
 
 class Classifier(torch.nn.Module):
-    def __init__(self, n_mel_channels, n_frames, n_emotions):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, linear_model=True):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
-        self.model = torch.nn.Sequential(
-            module(n_mel_channels * n_frames, 1024),
-            module(1024, 512),
-            module(512, 256),
-            module(256, 128),
-            module(128, 64),
-            module(64, n_emotions)
-        )
+        self.linear_model = linear_model
+        if linear_model:
+            self.model = torch.nn.Sequential(
+                module(n_mel_channels * n_frames, 1024),
+                module(1024, 1024),
+                module(1024, 256),
+                module(256, 64),
+                torch.nn.Linear(64, n_emotions),
+                torch.nn.Sigmoid(),
+                torch.nn.Softmax()
+            )
+        else:
+            self.model = torch.nn.Sequential(
+                conv_module(n_mel_channels, 512),
+                conv_module(512, 256),
+                conv_module(256, 128),
+                torch.nn.Conv1d(128, n_emotions, 5, padding=2),
+                torch.nn.Flatten(),
+                torch.nn.Linear(n_emotions * n_frames, n_emotions),
+                torch.nn.Dropout(0.5),
+                torch.nn.Sigmoid(),
+                torch.nn.Softmax()
+            )
 
     def forward(self, x, smallest_length):
-        if smallest_length - self.n_frames > 0:
-            start = np.random.randint(0, smallest_length - self.n_frames)
+        if smallest_length - self.n_frames - 25 > 0:
+            start = np.random.randint(25, smallest_length - self.n_frames)
         else:
             start = 0
-        x = x[:, :, start:start + self.n_frames].reshape(x.size(0), -1)
+        x = x[:, :, start:start + self.n_frames]
+        if self.linear_model:
+            x = x.reshape(x.size(0), -1)
         return self.model(x)
 
 
@@ -149,47 +183,71 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size)
     hparams = HParams()
     model = Classifier(hparams.n_mel_channels, n_frames, 5).cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=hparams.weight_decay)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=hparams.weight_decay)
+    best_val_loss = float('inf')
+    last_path = None
     for epoch in range(epochs):
-        train_epoch(epoch, epochs, model, optimizer, train_loader)
-        val_epoch(model, val_loader)
+        train_epoch(epoch, epochs, model, optimizer, train_loader, use_intended_labels)
+        val_loss = val_epoch(model, val_loader, use_intended_labels)
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            path = f"{wandb.run.dir}/epoch={epoch}-val_loss={val_loss}.ckpt"
+            torch.save({'epoch': epoch,
+                        'state_dict': model.state_dict()}, path)
+            if last_path is not None:
+                os.remove(last_path)
+            last_path = path
 
 
-def train_epoch(epoch, epochs, model, optimizer, train_loader):
+def train_epoch(epoch, epochs, model, optimizer, train_loader, use_intended_labels):
     progress_bar = tqdm(enumerate(train_loader), total=len(train_loader))
     model.train()
     for i, batch in progress_bar:
         model.zero_grad()
         x, smallest_length, y = batch
         y_pred = model(x, smallest_length).squeeze(-1)
-        loss = torch.nn.MSELoss()(y, y_pred)
+        if use_intended_labels:
+            loss = torch.nn.BCELoss()(y_pred, y)
+        else:
+            loss = torch.nn.MSELoss()(y_pred, y)
         progress_bar.set_description(f'Epoch {epoch + 1}/{epochs}. Iter {i}/{len(train_loader)}. Loss = {loss}')
-        wandb.log({'Train Loss': loss})
+        wandb.log({'Train Loss': loss, 'Epoch/Iter': epoch})
         loss.backward()
         optimizer.step()
 
 
-def val_epoch(model, val_loader):
+def val_epoch(model, val_loader, use_intended_labels):
     model.eval()
     with torch.no_grad():
         val_loss = 0
+        dominant_emotion_pred = 0
         for batch in val_loader:
             x, smallest_length, y = batch
             y_pred = model(x, smallest_length).squeeze(-1)
-            loss = torch.nn.MSELoss()(y, y_pred)
+            dominant_emotions = 0
+            for i in range(len(y)):
+                dominant_emotions += int(torch.argmax(y_pred[i]) == torch.argmax(y[i]))
+            dominant_emotion_pred += dominant_emotions / len(y)
+            if use_intended_labels:
+                loss = torch.nn.BCELoss()(y_pred, y)
+            else:
+                loss = torch.nn.MSELoss()(y_pred, y)
             val_loss += loss
-        wandb.log({'Validation Loss': val_loss / len(val_loader)})
+        val_loss /= len(val_loader)
+        wandb.log({'Validation Loss': val_loss, 'Dominant emotion prediction': dominant_emotion_pred / len(val_loader)})
+        print(f"{100 * dominant_emotion_pred / len(val_loader):.2f} % of dominant emotions where predicted.")
+    return val_loss
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=16,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--n_frames', type=int, default=150, help='Number of frames to use for classification')
+    parser.add_argument('--n_frames', type=int, default=30, help='Number of frames to use for classification')
     # dryrun
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
