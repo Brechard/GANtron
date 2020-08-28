@@ -236,7 +236,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
-    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=128,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
