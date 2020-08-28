@@ -3,8 +3,9 @@ import os
 from random import shuffle
 
 import numpy as np
+import pytorch_lightning as pl
 import torch
-import wandb
+from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -12,7 +13,6 @@ import layers
 from hparams import HParams
 from utils import load_vesus
 from utils import load_wav_to_torch
-import matplotlib.pyplot as plt
 
 emotion_to_id = {
     'Neutral': 0,
@@ -36,7 +36,7 @@ def conv_module(size_in, size_out):
     return torch.nn.Sequential(
         torch.nn.Conv1d(size_in, size_out, 5, padding=2),
         torch.nn.Dropout(0.2),
-        torch.nn.LeakyReLU(0.1)
+        torch.nn.ReLU()
     )
 
 
@@ -86,12 +86,14 @@ class MelLoaderCollate:
         return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
 
 
-class Classifier(torch.nn.Module):
-    def __init__(self, n_mel_channels, n_frames, n_emotions, linear_model=True):
+class Classifier(pl.LightningModule):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
         self.linear_model = linear_model
+        self.criterion = criterion
+        self.lr = lr
         if linear_model:
             self.model = torch.nn.Sequential(
                 module(n_mel_channels * n_frames, 1024),
@@ -110,20 +112,56 @@ class Classifier(torch.nn.Module):
                 torch.nn.Conv1d(128, n_emotions, 5, padding=2),
                 torch.nn.Flatten(),
                 torch.nn.Linear(n_emotions * n_frames, n_emotions),
-                torch.nn.Dropout(0.5),
-                torch.nn.Sigmoid(),
+                torch.nn.Dropout(0.1),
                 torch.nn.Softmax()
             )
 
     def forward(self, x, smallest_length):
         if smallest_length - self.n_frames - 25 > 0:
-            start = np.random.randint(25, smallest_length - self.n_frames)
+            start = np.random.randint(25, smallest_length.cpu().numpy() - self.n_frames)
         else:
             start = 0
         x = x[:, :, start:start + self.n_frames]
         if self.linear_model:
             x = x.reshape(x.size(0), -1)
         return self.model(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
+
+    def training_step(self, batch, batch_idx):
+        x, smallest_length, y = batch
+        y_hat = self(x, smallest_length).squeeze(-1)
+        loss = self.criterion(y_hat, y)
+        # result = pl.TrainResult(loss)
+        output = {
+            'loss': loss,
+            'progress_bar': {'train_loss': loss},
+            'log': {'train_loss': loss},
+        }
+        return output
+
+    def validation_step(self, batch, batch_idx):
+        x, smallest_length, y = batch
+        y_hat = self(x, smallest_length).squeeze(-1)
+        loss = self.criterion(y_hat, y)
+        output = {
+            'val_loss': loss,
+            'progress_bar': {'val_loss': loss},
+            'log': {'val_loss': loss},
+        }
+        return output
+
+    def test_step(self, batch, batch_idx):
+        x, smallest_length, y = batch
+        y_hat = self(x, smallest_length).squeeze(-1)
+        loss = self.criterion(y_hat, y)
+        output = {
+            'test_loss': loss,
+            'progress_bar': {'test_loss': loss},
+        }
+        return output
 
 
 def load_npy_mels(filepaths_list):
@@ -179,64 +217,19 @@ def prepare_data(vesus_path, use_intended_labels, batch_size):
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames):
+def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, linear_model):
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size)
+    criterion = torch.nn.MSELoss()
+    if use_intended_labels:
+        criterion = torch.nn.BCELoss()
+
     hparams = HParams()
-    model = Classifier(hparams.n_mel_channels, n_frames, 5).cuda()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=hparams.weight_decay)
-    best_val_loss = float('inf')
-    last_path = None
-    for epoch in range(epochs):
-        train_epoch(epoch, epochs, model, optimizer, train_loader, use_intended_labels)
-        val_loss = val_epoch(model, val_loader, use_intended_labels)
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            path = f"{wandb.run.dir}/epoch={epoch}-val_loss={val_loss}.ckpt"
-            torch.save({'epoch': epoch,
-                        'state_dict': model.state_dict()}, path)
-            if last_path is not None:
-                os.remove(last_path)
-            last_path = path
-
-
-def train_epoch(epoch, epochs, model, optimizer, train_loader, use_intended_labels):
-    progress_bar = tqdm(enumerate(train_loader), total=len(train_loader))
-    model.train()
-    for i, batch in progress_bar:
-        model.zero_grad()
-        x, smallest_length, y = batch
-        y_pred = model(x, smallest_length).squeeze(-1)
-        if use_intended_labels:
-            loss = torch.nn.BCELoss()(y_pred, y)
-        else:
-            loss = torch.nn.MSELoss()(y_pred, y)
-        progress_bar.set_description(f'Epoch {epoch + 1}/{epochs}. Iter {i}/{len(train_loader)}. Loss = {loss}')
-        wandb.log({'Train Loss': loss, 'Epoch/Iter': epoch})
-        loss.backward()
-        optimizer.step()
-
-
-def val_epoch(model, val_loader, use_intended_labels):
-    model.eval()
-    with torch.no_grad():
-        val_loss = 0
-        dominant_emotion_pred = 0
-        for batch in val_loader:
-            x, smallest_length, y = batch
-            y_pred = model(x, smallest_length).squeeze(-1)
-            dominant_emotions = 0
-            for i in range(len(y)):
-                dominant_emotions += int(torch.argmax(y_pred[i]) == torch.argmax(y[i]))
-            dominant_emotion_pred += dominant_emotions / len(y)
-            if use_intended_labels:
-                loss = torch.nn.BCELoss()(y_pred, y)
-            else:
-                loss = torch.nn.MSELoss()(y_pred, y)
-            val_loss += loss
-        val_loss /= len(val_loader)
-        wandb.log({'Validation Loss': val_loss, 'Dominant emotion prediction': dominant_emotion_pred / len(val_loader)})
-        print(f"{100 * dominant_emotion_pred / len(val_loader):.2f} % of dominant emotions where predicted.")
-    return val_loss
+    model = Classifier(hparams.n_mel_channels, n_frames, 5, criterion=criterion, lr=learning_rate,
+                       linear_model=linear_model)
+    wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
+    wandb_logger.log_hyperparams(args)
+    trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger)
+    trainer.fit(model, train_loader, val_loader)
 
 
 if __name__ == '__main__':
@@ -244,14 +237,16 @@ if __name__ == '__main__':
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', action='store_true', help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=16,
+    parser.add_argument('--batch_size', type=int, default=128,
                         help='Batch size, recommended to use a small one even if it is smaller.')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=30, help='Number of frames to use for classification')
-    # dryrun
+    parser.add_argument('--linear_model', type=int, default=30, help='Number of frames to use for classification')
+
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
            f'{"-intendedLabels" if args.use_intended_labels else ""}'
-    wandb.init(project="Classifier", config=args, name=name)
+    # wandb.init(project="Classifier", config=args, name=name)
 
-    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames)
+    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
+          args.linear_model)
