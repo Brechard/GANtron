@@ -155,13 +155,26 @@ class Classifier(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, smallest_length, y = batch
         y_hat = self(x, smallest_length).squeeze(-1)
+        acc = 0
+        for i in range(len(y)):
+            acc += int(torch.argmax(y[i]) == torch.argmax(y_hat[i]))
+
         loss = self.criterion(y_hat, y)
         output = {
             'val_loss': loss,
-            'progress_bar': {'val_loss': loss},
-            'log': {'val_loss': loss},
+            'log': {'val_loss': loss, 'acc': acc / len(y)},
         }
         return output
+
+    def validation_epoch_end(self, outputs):
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        avg_acc = torch.stack([x['acc'] for x in outputs]).mean()
+        logs = {
+            'val_loss': avg_loss,
+            'acc': avg_acc
+        }
+
+        return {'avg_val_loss': avg_loss, 'log': logs}
 
     def test_step(self, batch, batch_idx):
         x, smallest_length, y = batch
@@ -256,7 +269,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
-    parser.add_argument('--use_intended_labels', type=str2bool, default=True, help='Use intended emotions instead of voted')
+    parser.add_argument('--use_intended_labels', type=str2bool, default=True,
+                        help='Use intended emotions instead of voted')
     parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size, recommended to use a small one even if it is smaller.')
