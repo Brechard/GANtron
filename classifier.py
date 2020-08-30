@@ -162,13 +162,13 @@ class Classifier(pl.LightningModule):
         loss = self.criterion(y_hat, y)
         output = {
             'val_loss': loss,
-            'log': {'val_loss': loss, 'acc': acc / len(y)},
+            'acc': acc / len(y)
         }
         return output
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        avg_acc = torch.stack([x['acc'] for x in outputs]).mean()
+        avg_acc = np.mean([x['acc'] for x in outputs])
         logs = {
             'val_loss': avg_loss,
             'acc': avg_acc
