@@ -221,7 +221,7 @@ def prepare_data(vesus_path, use_intended_labels, batch_size):
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name):
+def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision):
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
@@ -231,7 +231,7 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
     model = Classifier(hparams.n_mel_channels, n_frames, 5, criterion=criterion, lr=learning_rate)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
-    trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger)
+    trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision)
     trainer.fit(model, train_loader, val_loader)
 
 
@@ -256,10 +256,12 @@ if __name__ == '__main__':
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
+    parser.add_argument('--precision', type=int, default=32, help='Precision 32/16 bits')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
            f'{"-intendedLabels" if args.use_intended_labels else ""}'
     # wandb.init(project="Classifier", config=args, name=name)
 
-    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name)
+    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
+          args.precision)
