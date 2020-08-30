@@ -13,6 +13,7 @@ import layers
 from hparams import HParams
 from utils import load_vesus
 from utils import load_wav_to_torch
+import matplotlib.pyplot as plt
 
 emotion_to_id = {
     'Neutral': 0,
@@ -27,7 +28,7 @@ def module(size_in, size_out):
     return torch.nn.Sequential(
         torch.nn.Linear(size_in, size_out),
         torch.nn.BatchNorm1d(size_out),
-        torch.nn.Dropout(0.2),
+        torch.nn.Dropout(0.5),
         torch.nn.LeakyReLU(0.1)
     )
 
@@ -100,28 +101,12 @@ class Classifier(pl.LightningModule):
         self.linear_model = linear_model
         self.criterion = criterion
         self.lr = lr
-        if linear_model:
-            self.model = torch.nn.Sequential(
-                module(n_mel_channels * n_frames, 1024),
-                module(1024, 1024),
-                module(1024, 256),
-                module(256, 64),
-                torch.nn.Linear(64, n_emotions),
-                torch.nn.Sigmoid(),
-                torch.nn.Softmax()
-            )
-        else:
-            self.model = torch.nn.Sequential(
-                conv_module(1, 256),
-                conv_module(256, 256),
-                conv_module(256, 128),
-                torch.nn.Conv2d(128, n_emotions, kernel_size=3, padding=1),
-                torch.nn.Flatten(),
-                # Divide by 2^3 because of max pool
-                torch.nn.Linear(int(n_emotions * (n_mel_channels / 2 ** 3) * (n_frames / 2 ** 3)), n_emotions),
-                torch.nn.Dropout(0.1),
-                torch.nn.Softmax()
-            )
+        self.model = torch.nn.Sequential(
+            module(n_mel_channels * n_frames, 256),
+            module(256, 32),
+            torch.nn.Linear(32, n_emotions),
+            torch.nn.Softmax()
+        )
 
     def forward(self, x, smallest_length):
         if smallest_length - self.n_frames - 25 > 0:
@@ -134,7 +119,7 @@ class Classifier(pl.LightningModule):
         x = x[:, :, start:start + self.n_frames]
         if self.linear_model:
             x = x.reshape(x.size(0), -1)
-        return self.model(x.unsqueeze(1))
+        return self.model(x.reshape(x.size(0), -1))
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -144,7 +129,6 @@ class Classifier(pl.LightningModule):
         x, smallest_length, y = batch
         y_hat = self(x, smallest_length).squeeze(-1)
         loss = self.criterion(y_hat, y)
-        # result = pl.TrainResult(loss)
         output = {
             'loss': loss,
             'progress_bar': {'train_loss': loss},
@@ -269,14 +253,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
-    parser.add_argument('--use_intended_labels', type=str2bool, default=True,
+    parser.add_argument('--use_intended_labels', type=str2bool, default=False,
                         help='Use intended emotions instead of voted')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size, recommended to use a small one even if it is smaller.')
-    parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
-    parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
-    parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
