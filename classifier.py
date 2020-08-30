@@ -94,11 +94,10 @@ class MelLoaderCollate:
 
 
 class Classifier(pl.LightningModule):
-    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
-        self.linear_model = linear_model
         self.criterion = criterion
         self.lr = lr
         self.model = torch.nn.Sequential(
@@ -116,10 +115,8 @@ class Classifier(pl.LightningModule):
         else:
             start = 0
 
-        x = x[:, :, start:start + self.n_frames]
-        if self.linear_model:
-            x = x.reshape(x.size(0), -1)
-        return self.model(x.reshape(x.size(0), -1))
+        x = x[:, :, start:start + self.n_frames].reshape(x.size(0), -1)
+        return self.model(x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -224,15 +221,14 @@ def prepare_data(vesus_path, use_intended_labels, batch_size):
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, linear_model):
+def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name):
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
         criterion = torch.nn.BCELoss()
 
     hparams = HParams()
-    model = Classifier(hparams.n_mel_channels, n_frames, 5, criterion=criterion, lr=learning_rate,
-                       linear_model=linear_model)
+    model = Classifier(hparams.n_mel_channels, n_frames, 5, criterion=criterion, lr=learning_rate)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger)
@@ -266,5 +262,4 @@ if __name__ == '__main__':
            f'{"-intendedLabels" if args.use_intended_labels else ""}'
     # wandb.init(project="Classifier", config=args, name=name)
 
-    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
-          args.linear_model)
+    train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name)
