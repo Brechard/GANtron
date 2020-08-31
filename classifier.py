@@ -54,6 +54,7 @@ class MelLoader(torch.utils.data.Dataset):
     def __init__(self, mel_paths, emotions, mel_offset):
         self.mel_paths = mel_paths
         self.emotions = emotions
+        assert len(mel_paths) == len(emotions)
         self.mel_offset = mel_offset
         self.indexes = list(range(len(mel_paths)))
         shuffle(self.indexes)
@@ -221,9 +222,10 @@ def prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset):
     train_loader = DataLoader(MelLoader(train_filepaths, train_emotions, mel_offset), num_workers=0, shuffle=True,
                               batch_size=batch_size, pin_memory=False, drop_last=True, collate_fn=MelLoaderCollate())
 
-    val_loader = DataLoader(MelLoader(val_filepaths, train_emotions, mel_offset), num_workers=0,
+    val_loader = DataLoader(MelLoader(val_filepaths, val_emotions, mel_offset), num_workers=0,
                             shuffle=False, batch_size=batch_size, pin_memory=False, collate_fn=MelLoaderCollate())
-    test_loader = MelLoader(test_filepaths, train_emotions, mel_offset)
+
+    test_loader = MelLoader(test_filepaths, test_emotions, mel_offset)
 
     return train_loader, val_loader, test_loader
 
