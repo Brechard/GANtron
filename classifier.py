@@ -1,12 +1,8 @@
 import argparse
-import multiprocessing
 import os
-from functools import partial
 from random import shuffle
-from sklearn.preprocessing import StandardScaler
 
 import librosa
-import matplotlib.pyplot as plt
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -16,7 +12,6 @@ from tqdm import tqdm
 
 from hparams import HParams
 from utils import load_vesus
-import pickle
 
 emotion_to_id = {
     'Neutral': 0,
@@ -98,18 +93,31 @@ class MelLoaderCollate:
 
 
 class Classifier(pl.LightningModule):
-    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
         self.criterion = criterion
         self.lr = lr
-        self.model = torch.nn.Sequential(
-            module(n_mel_channels * n_frames, 256),
-            module(256, 32),
-            torch.nn.Linear(32, n_emotions),
-            torch.nn.Softmax()
-        )
+        self.linear_model = linear_model
+        if linear_model:
+            self.model = torch.nn.Sequential(
+                module(n_mel_channels * n_frames, 256),
+                module(256, 32),
+                torch.nn.Linear(32, n_emotions),
+                torch.nn.Softmax()
+            )
+        else:
+            self.model = torch.nn.Sequential(
+                conv_module(1, 256),
+                conv_module(256, 128),
+                conv_module(128, n_emotions),
+                torch.nn.Flatten(),
+                # Divide by 2^3 because of max pool
+                torch.nn.Linear(int(n_emotions * (n_mel_channels / 2 ** 3) * (n_frames / 2 ** 3)), n_emotions),
+                torch.nn.Dropout(0.1),
+                torch.nn.Softmax()
+            )
 
     def forward(self, x, smallest_length):
         if smallest_length - self.n_frames - 25 > 0:
@@ -119,7 +127,12 @@ class Classifier(pl.LightningModule):
         else:
             start = 0
 
-        x = x[:, :, start:start + self.n_frames].reshape(x.size(0), -1)
+        x = x[:, :, start:start + self.n_frames]
+        if self.linear_model:
+            x = x.reshape(x.size(0), -1)
+        else:
+            x = x.unsqueeze(1)
+
         return self.model(x)
 
     def configure_optimizers(self):
@@ -230,14 +243,16 @@ def prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset):
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision, mel_offset):
+def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision, mel_offset,
+          linear_model):
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
         criterion = torch.nn.BCELoss()
 
     hparams = HParams()
-    model = Classifier(hparams.n_mel_channels, n_frames, 5, criterion=criterion, lr=learning_rate)
+    model = Classifier(hparams.n_mel_channels, n_frames, n_emotions=5, criterion=criterion, lr=learning_rate,
+                       linear_model=linear_model)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision)
@@ -260,6 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', type=str2bool, default=False,
                         help='Use intended emotions instead of voted')
+    parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
     parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size, recommended to use a small one even if it is smaller.')
@@ -274,4 +290,4 @@ if __name__ == '__main__':
     # wandb.init(project="Classifier", config=args, name=name)
 
     train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
-          args.precision, args.mel_offset)
+          args.precision, args.mel_offset, args.linear_model)
