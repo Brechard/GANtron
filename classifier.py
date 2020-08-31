@@ -93,7 +93,7 @@ class MelLoaderCollate:
 
 
 class Classifier(pl.LightningModule):
-    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model, model_size):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
@@ -102,16 +102,16 @@ class Classifier(pl.LightningModule):
         self.linear_model = linear_model
         if linear_model:
             self.model = torch.nn.Sequential(
-                module(n_mel_channels * n_frames, 256),
-                module(256, 32),
+                module(n_mel_channels * n_frames, model_size),
+                module(model_size, 32),
                 torch.nn.Linear(32, n_emotions),
                 torch.nn.Softmax()
             )
         else:
             self.model = torch.nn.Sequential(
-                conv_module(1, 256),
-                conv_module(256, 128),
-                conv_module(128, n_emotions),
+                conv_module(1, model_size),
+                conv_module(model_size, model_size),
+                conv_module(model_size, n_emotions),
                 torch.nn.Flatten(),
                 # Divide by 2^3 because of max pool
                 torch.nn.Linear(int(n_emotions * (n_mel_channels / 2 ** 3) * (n_frames / 2 ** 3)), n_emotions),
@@ -244,7 +244,7 @@ def prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset):
 
 
 def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision, mel_offset,
-          linear_model):
+          linear_model, model_size):
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
@@ -252,7 +252,7 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
 
     hparams = HParams()
     model = Classifier(hparams.n_mel_channels, n_frames, n_emotions=5, criterion=criterion, lr=learning_rate,
-                       linear_model=linear_model)
+                       linear_model=linear_model, model_size=model_size)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision)
@@ -281,13 +281,15 @@ if __name__ == '__main__':
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
-    parser.add_argument('--precision', type=int, default=32, help='Precision 32/16 bits')
+    parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
+    parser.add_argument('--model_size', type=int, default=256, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
-           f'{"-intendedLabels" if args.use_intended_labels else ""}'
+           f'{"-intendedLabels" if args.use_intended_labels else ""}' \
+           f'-{args.model_size}{"linear" if args.linear_model else "conv"}'
     # wandb.init(project="Classifier", config=args, name=name)
 
     train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
-          args.precision, args.mel_offset, args.linear_model)
+          args.precision, args.mel_offset, args.linear_model, args.model_size)
