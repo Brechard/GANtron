@@ -259,7 +259,7 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision,
-                         early_stop_callback=EarlyStopping('val_loss'))
+                         early_stop_callback=EarlyStopping('val_loss', patience=10))
     trainer.fit(model, train_loader, val_loader)
 
 
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_intended_labels', type=str2bool, default=False,
                         help='Use intended emotions instead of voted')
     parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
