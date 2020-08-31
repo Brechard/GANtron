@@ -6,6 +6,7 @@ import librosa
 import numpy as np
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -255,7 +256,8 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
                        linear_model=linear_model, model_size=model_size)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
-    trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision)
+    trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision,
+                         early_stop_callback=EarlyStopping('val_loss'))
     trainer.fit(model, train_loader, val_loader)
 
 
