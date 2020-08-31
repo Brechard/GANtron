@@ -94,13 +94,14 @@ class MelLoaderCollate:
 
 
 class Classifier(pl.LightningModule):
-    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model, model_size):
+    def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model, model_size, intended_labels):
         super().__init__()
         self.n_mel_channels = n_mel_channels
         self.n_frames = n_frames
         self.criterion = criterion
         self.lr = lr
         self.linear_model = linear_model
+        self.val_log = "Validation loss - " + ("Intended" if intended_labels else "Calculated")
         if linear_model:
             self.model = torch.nn.Sequential(
                 module(n_mel_channels * n_frames, model_size),
@@ -170,6 +171,7 @@ class Classifier(pl.LightningModule):
         avg_acc = np.mean([x['acc'] for x in outputs])
         logs = {
             'val_loss': avg_loss,
+            self.val_log: avg_loss,
             'acc': avg_acc
         }
 
@@ -253,7 +255,7 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
 
     hparams = HParams()
     model = Classifier(hparams.n_mel_channels, n_frames, n_emotions=5, criterion=criterion, lr=learning_rate,
-                       linear_model=linear_model, model_size=model_size)
+                       linear_model=linear_model, model_size=model_size, intended_labels=use_intended_labels)
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision,
