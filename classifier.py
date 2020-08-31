@@ -1,26 +1,19 @@
 import argparse
 import os
-from random import shuffle
+from abc import ABC
 
 import librosa
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from data_utils import MelLoader, MelLoaderCollate
 from hparams import HParams
-from utils import load_vesus
-
-emotion_to_id = {
-    'Neutral': 0,
-    'Angry': 1,
-    'Happy': 2,
-    'Sad': 3,
-    'Fearful': 4
-}
+from utils import load_vesus, str2bool
 
 
 def module(size_in, size_out):
@@ -46,54 +39,7 @@ def conv_module(size_in, size_out, kernel_size=3, dilation=1, padding=None, avg_
     )
 
 
-class MelLoader(torch.utils.data.Dataset):
-    def __init__(self, mel_paths, emotions, mel_offset):
-        self.mel_paths = mel_paths
-        self.emotions = emotions
-        assert len(mel_paths) == len(emotions)
-        self.mel_offset = mel_offset
-        self.indexes = list(range(len(mel_paths)))
-        shuffle(self.indexes)
-
-    def get_mel(self, path):
-        mel = np.load(path, allow_pickle=True)[:, self.mel_offset:]
-        normalized_mel = mel / 80 + 1
-        return torch.FloatTensor(normalized_mel)
-
-        # return torch.FloatTensor(np.load(path, allow_pickle=True))
-
-    def __getitem__(self, index):
-        path = self.mel_paths[self.indexes[index]]
-        mel = self.get_mel(self.mel_paths[self.indexes[index]])
-        em = torch.FloatTensor(self.emotions[self.indexes[index]])
-        return mel, em
-
-    def __len__(self):
-        return len(self.mel_paths)
-
-
-class MelLoaderCollate:
-    """ DataLoader requires all elements of the batch to have the same size, so we pad them to 0. """
-
-    def __call__(self, batch):
-        input_lengths, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([len(x[0][0]) for x in batch]),
-            dim=0, descending=True)
-        max_input_len = input_lengths[0]
-        mel_padded = torch.FloatTensor(len(batch), len(batch[0][0]), max_input_len)
-        mel_padded.zero_()
-        emotions = torch.FloatTensor(len(batch), len(batch[0][1]))
-        emotions.zero_()
-
-        for i in range(len(ids_sorted_decreasing)):
-            mel = batch[ids_sorted_decreasing[i]][0]
-            mel_padded[i, :, :mel.size(1)] = mel
-            emotions[i] = batch[ids_sorted_decreasing[i]][1]
-
-        return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
-
-
-class Classifier(pl.LightningModule):
+class Classifier(pl.LightningModule, ABC):
     def __init__(self, n_mel_channels, n_frames, n_emotions, criterion, lr, linear_model, model_size, intended_labels,
                  epochs):
         super().__init__()
@@ -108,8 +54,8 @@ class Classifier(pl.LightningModule):
             self.model = torch.nn.Sequential(
                 module(n_mel_channels * n_frames, model_size),
                 module(model_size, model_size),
-                torch.nn.Linear(model_size, n_emotions),
-                torch.nn.Softmax()
+                module(model_size, model_size),
+                torch.nn.Linear(model_size, n_emotions)
             )
         else:
             self.model = torch.nn.Sequential(
@@ -119,7 +65,6 @@ class Classifier(pl.LightningModule):
                 torch.nn.Flatten(),
                 # Divide by 2^3 because of max pool
                 torch.nn.Linear(int(n_emotions * (n_mel_channels / 2 ** 3) * (n_frames / 2 ** 3)), n_emotions),
-                torch.nn.Softmax()
             )
 
     def forward(self, x, smallest_length):
@@ -136,7 +81,10 @@ class Classifier(pl.LightningModule):
         else:
             x = x.unsqueeze(1)
 
-        return self.model(x)
+        if isinstance(self.criterion, torch.nn.BCEWithLogitsLoss):
+            return self.model(x)
+
+        return torch.nn.Softmax()(self.model(x))
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -204,28 +152,19 @@ def load_npy_mels(filepaths_list):
         for path in tqdm(filepath):
             new_filepaths_list.append(path.split('.')[0] + '.npy')
             if not os.path.exists(path.split('.')[0] + '.npy'):
-                melspec = librosa.power_to_db(
-                    librosa.feature.melspectrogram(librosa.load(path)[0],
-                                                   sr=hparams.sampling_rate, n_fft=hparams.filter_length,
-                                                   n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
-                    ref=np.max)
-                np.save(path.split('.')[0] + '.npy', melspec)
-                if melspec.shape[1] < min_len:
-                    min_len = melspec.shape[1]
+                load_mel(path.split('.')[0] + '.npy', hparams)
         new_filepaths_lists.append(new_filepaths_list)
 
     return new_filepaths_lists
 
 
 def load_mel(path, hparams):
-    if not os.path.exists(path.split('.')[0] + '.npy'):
-        melspec = librosa.power_to_db(
-            librosa.feature.melspectrogram(librosa.load(path)[0],
-                                           sr=hparams.sampling_rate, n_fft=hparams.filter_length,
-                                           n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
-            ref=np.max)
-        np.save(path.split('.')[0] + '.npy', melspec)
-    return path.split('.')[0] + '.npy'
+    melspec = librosa.power_to_db(
+        librosa.feature.melspectrogram(librosa.load(path)[0],
+                                       sr=hparams.sampling_rate, n_fft=hparams.filter_length,
+                                       n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
+        ref=np.max)
+    np.save(path.split('.')[0] + '.npy', melspec)
 
 
 def prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset):
@@ -254,31 +193,23 @@ def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_
     train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
-        criterion = torch.nn.BCELoss()
+        criterion = torch.nn.BCEWithLogitsLoss()
 
     hparams = HParams()
     model = Classifier(hparams.n_mel_channels, n_frames, n_emotions=5, criterion=criterion, lr=learning_rate,
                        linear_model=linear_model, model_size=model_size, intended_labels=use_intended_labels,
                        epochs=epochs)
+
     wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
+    checkpoint_callback = ModelCheckpoint(filepath=wandb_logger.save_dir + '/{epoch}-{val_loss:.2f}-{acc:.4f}')
+
     trainer = pl.Trainer(max_epochs=epochs, gpus=1, logger=wandb_logger, precision=precision,
-                         early_stop_callback=EarlyStopping('val_loss', patience=20))
+                         checkpoint_callback=checkpoint_callback)
     trainer.fit(model, train_loader, val_loader)
 
 
 if __name__ == '__main__':
-    def str2bool(v):
-        if isinstance(v, bool):
-            return v
-        if v.lower() in ('yes', 'true', 't', 'y', '1'):
-            return True
-        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-            return False
-        else:
-            raise argparse.ArgumentTypeError('Boolean value expected.')
-
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
     parser.add_argument('--use_intended_labels', type=str2bool, default=True,

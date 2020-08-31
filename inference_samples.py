@@ -39,28 +39,58 @@ def generate_audio(waveglow, mel_spectrogram):
     return audio
 
 
-def force_style_emotions(style_shape, n_styles=6, n_samples_styles=20):
-    emotions = None
-    if hparams.use_labels:
+def force_style_emotions(gantron, input_sequence, output_path, speaker, force_emotions, force_style, style_shape=None,
+                         n_styles=6, n_samples_styles=20):
+    """
+    Inference a given number of samples where the style or the emotion is forced.
+
+    Args:
+        gantron: GANtron model to use for inference.
+        input_sequence: Input sequence to inference.
+        output_path: Shape of the style that will be forced.
+        speaker: Speaker to use.
+        force_emotions: Flag to force the emotions.
+        force_style: Flag to force the style.
+        style_shape: Folder path to save the inferred samples.
+        n_styles: Number of styles/emotions to force.
+        n_samples_styles: Number of samples to inference per style.
+
+    Returns:
+        None
+    """
+    emotions, styles = None, None
+    if force_emotions:
         emotions = [
-                            # [Neutral, Angry, Happy, Sad, Fearful]
+                       # [Neutral, Angry, Happy, Sad, Fearful]
                        torch.FloatTensor([[0.6, 0, 0, 0, 0]]).cuda(),
                        torch.FloatTensor([[0, 0.7, 0, 0, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0.5, 0, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0.8, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
                    ] + [torch.rand(1, 5).cuda() for i in range(n_styles - 3)]
-    styles = [
-                 torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
-                 torch.ones(1, style_shape[0], style_shape[1]).cuda() * 0.5,
-                 torch.ones(1, style_shape[0], style_shape[1]).cuda(),
-             ] + [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
-                  range(n_styles - 3)]
+    if force_style:
+        styles = [
+                     torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
+                     torch.ones(1, style_shape[0], style_shape[1]).cuda() * 0.5,
+                     torch.ones(1, style_shape[0], style_shape[1]).cuda(),
+                 ] + [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
+                      range(n_styles - 3)]
     for st in tqdm(range(n_styles)):
         for i in range(n_samples_styles):
-            mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(sequence, styles[st],
-                                                                                emotions=emotions[st], speaker=speaker)
-            np.save(f'{args.output_path}/{st}-{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+            style, emotion = None, None
+            if styles is not None:
+                style = styles[st]
+            if emotions is not None:
+                emotion = emotions[st]
+            mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(input_sequence, style,
+                                                                                emotions=emotion, speaker=speaker)
+
+            name = ''
+            if force_emotions:
+                name += f'emotion-{st}-'
+            if force_style:
+                name += f'style-{st}-'
+            np.save(f'{output_path}/{name}{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
 
 
 def random_style():
@@ -84,7 +114,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--checkpoint_path', type=str, required=True, help='GANtron checkpoint path')
     parser.add_argument('--generate_audio', action='store_true', help='Generate the audio files')
-    parser.add_argument('--force_style', action='store_true', help='Generate with forced styles')
+    parser.add_argument('--force', action='store_true', help='Generate with forced styles')
     parser.add_argument('-w', '--waveglow_path', type=str, required=False, help='waveglow checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Model name to save the ')
     parser.add_argument('--samples', type=int, default=200, help='Number of samples to generate')
@@ -105,7 +135,10 @@ if __name__ == '__main__':
     sequence = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
     speaker = None if args.hparams is None else torch.LongTensor([args.speaker]).cuda()
 
-    if args.force_style:
-        force_style_emotions([sequence.size(1), hparams.noise_size])
+    if args.force:
+        force_style_emotions(gantron, sequence, args.output_path, speaker,
+                             force_emotions=hparams.use_labels,
+                             force_style=hparams.use_noise,
+                             style_shape=[sequence.size(1), hparams.noise_size])
     else:
         random_style()

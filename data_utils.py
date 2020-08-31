@@ -7,6 +7,7 @@ import torch.utils.data
 import layers
 from text import text_to_sequence
 from utils import load_wav_to_torch, load_filepaths_and_text, load_vesus
+from random import shuffle
 
 
 class TextMelLoader(torch.utils.data.Dataset):
@@ -128,3 +129,52 @@ class TextMelCollate:
 
         return text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, \
                output_lengths
+
+
+class MelLoader(torch.utils.data.Dataset):
+    def __init__(self, mel_paths, emotions, mel_offset):
+        self.mel_paths = mel_paths
+        self.emotions = emotions
+        assert len(mel_paths) == len(emotions)
+        self.mel_offset = mel_offset
+        self.indexes = list(range(len(mel_paths)))
+        shuffle(self.indexes)
+
+    def get_mel(self, path):
+        mel = np.load(path, allow_pickle=True)[:, self.mel_offset:]
+        normalized_mel = mel / 80 + 1
+        return torch.FloatTensor(normalized_mel)
+
+        # return torch.FloatTensor(np.load(path, allow_pickle=True))
+
+    def __getitem__(self, index):
+        path = self.mel_paths[self.indexes[index]]
+        mel = self.get_mel(self.mel_paths[self.indexes[index]])
+        em = torch.FloatTensor(self.emotions[self.indexes[index]])
+        return mel, em
+
+    def __len__(self):
+        return len(self.mel_paths)
+
+
+class MelLoaderCollate:
+    """ DataLoader requires all elements of the batch to have the same size, so we pad them to 0. """
+
+    def __call__(self, batch):
+        input_lengths, ids_sorted_decreasing = torch.sort(
+            torch.LongTensor([len(x[0][0]) for x in batch]),
+            dim=0, descending=True)
+        max_input_len = input_lengths[0]
+        mel_padded = torch.FloatTensor(len(batch), len(batch[0][0]), max_input_len)
+        mel_padded.zero_()
+        emotions = torch.FloatTensor(len(batch), len(batch[0][1]))
+        emotions.zero_()
+
+        for i in range(len(ids_sorted_decreasing)):
+            mel = batch[ids_sorted_decreasing[i]][0]
+            mel_padded[i, :, :mel.size(1)] = mel
+            emotions[i] = batch[ids_sorted_decreasing[i]][1]
+
+        return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
+
+

@@ -159,3 +159,15 @@ def mel_to_audio(base_path, waveglow_path, randomize=True, force_create=False):
         with torch.no_grad():
             audio = waveglow.infer(torch.FloatTensor(mel).unsqueeze(0).cuda().half(), sigma=0.666)
             write(full_path, audio[0].to(torch.float32).data.cpu().numpy(), 22050)
+
+
+def str2bool(v):
+    import argparse
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
