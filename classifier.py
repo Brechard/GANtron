@@ -281,19 +281,19 @@ if __name__ == '__main__':
                         help='Use intended emotions instead of voted')
     parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
     parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=256,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
+    parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
     parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
     parser.add_argument('--model_size', type=int, default=256, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
-           f'{"-intendedLabels" if args.use_intended_labels else ""}' \
-           f'-{args.model_size}{"linear" if args.linear_model else "conv"}'
-    # wandb.init(project="Classifier", config=args, name=name)
+           f'-{args.model_size}{"linear" if args.linear_model else "conv"}'\
+           f'{"-intendedLabels" if args.use_intended_labels else ""}'
+        # wandb.init(project="Classifier", config=args, name=name)
 
     train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
           args.precision, args.mel_offset, args.linear_model, args.model_size)
