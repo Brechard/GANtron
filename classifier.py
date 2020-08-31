@@ -1,7 +1,12 @@
 import argparse
+import multiprocessing
 import os
+from functools import partial
 from random import shuffle
+from sklearn.preprocessing import StandardScaler
 
+import librosa
+import matplotlib.pyplot as plt
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -9,11 +14,9 @@ from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import layers
 from hparams import HParams
 from utils import load_vesus
-from utils import load_wav_to_torch
-import matplotlib.pyplot as plt
+import pickle
 
 emotion_to_id = {
     'Neutral': 0,
@@ -41,31 +44,31 @@ def conv_module(size_in, size_out, kernel_size=3, dilation=1, padding=None, avg_
     return torch.nn.Sequential(
         torch.nn.Conv2d(size_in, size_out, kernel_size=kernel_size, padding=padding, dilation=dilation),
         torch.nn.BatchNorm2d(size_out),
-        torch.nn.Dropout(0.1),
+        torch.nn.Dropout(0.5),
         torch.nn.LeakyReLU(0.1),
         torch.nn.AvgPool2d((avg_pool, avg_pool))
     )
 
 
 class MelLoader(torch.utils.data.Dataset):
-    def __init__(self, mel_paths, emotions):
+    def __init__(self, mel_paths, emotions, mel_offset):
         self.mel_paths = mel_paths
         self.emotions = emotions
+        self.mel_offset = mel_offset
         self.indexes = list(range(len(mel_paths)))
         shuffle(self.indexes)
 
     def get_mel(self, path):
-        return torch.FloatTensor(np.load(path, allow_pickle=True))
+        mel = np.load(path, allow_pickle=True)[:, self.mel_offset:]
+        normalized_mel = mel / 80 + 1
+        return torch.FloatTensor(normalized_mel)
+
+        # return torch.FloatTensor(np.load(path, allow_pickle=True))
 
     def __getitem__(self, index):
+        path = self.mel_paths[self.indexes[index]]
         mel = self.get_mel(self.mel_paths[self.indexes[index]])
         em = torch.FloatTensor(self.emotions[self.indexes[index]])
-        # fig, ax = plt.subplots(figsize=(6, 4))
-        # im = plt.imshow(mel.cpu().numpy(), origin='lower')
-        # plt.title(self.mel_paths[self.indexes[index]])
-        # fig.colorbar(im, ax=ax)
-        # plt.show()
-        # plt.imshow(librosa.feature.melspectrogram(librosa.load('C:/Users/rodri/Datasets/VESUS/Audio/1/Happy/100.wav')[0], sr=22050, n_fft=1024, n_mels=80, hop_length=256, win_length=1024), origin='lower'), plt.show()
         return mel, em
 
     def __len__(self):
@@ -170,16 +173,9 @@ class Classifier(pl.LightningModule):
 
 def load_npy_mels(filepaths_list):
     """
-    Save all mel spectrograms as npy files so they can be loaded much faster.
-    Load the mel spectrograms as Tacotron 2 does.
-
+    Save all mel spectrograms as np files so they can be loaded much faster.
     """
     hparams = HParams()
-    stft = layers.TacotronSTFT(
-        hparams.filter_length, hparams.hop_length, hparams.win_length,
-        hparams.n_mel_channels, hparams.sampling_rate, hparams.mel_fmin,
-        hparams.mel_fmax)
-    min_len = float('inf')
     new_filepaths_lists = []
     for n, filepath in enumerate(filepaths_list):
         progress_bar = tqdm(filepath)
@@ -188,12 +184,12 @@ def load_npy_mels(filepaths_list):
         for path in tqdm(filepath):
             new_filepaths_list.append(path.split('.')[0] + '.npy')
             if not os.path.exists(path.split('.')[0] + '.npy'):
-                audio = load_wav_to_torch(path, stft.sampling_rate)
-                audio = audio.unsqueeze(0)
-                audio = torch.autograd.Variable(audio, requires_grad=False)
-                melspec = stft.mel_spectrogram(audio)
-                melspec = torch.squeeze(melspec, 0)
-                np.save(path.split('.')[0] + '.npy', melspec.numpy())
+                melspec = librosa.power_to_db(
+                    librosa.feature.melspectrogram(librosa.load(path)[0],
+                                                   sr=hparams.sampling_rate, n_fft=hparams.filter_length,
+                                                   n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
+                    ref=np.max)
+                np.save(path.split('.')[0] + '.npy', melspec)
                 if melspec.shape[1] < min_len:
                     min_len = melspec.shape[1]
         new_filepaths_lists.append(new_filepaths_list)
@@ -201,7 +197,18 @@ def load_npy_mels(filepaths_list):
     return new_filepaths_lists
 
 
-def prepare_data(vesus_path, use_intended_labels, batch_size):
+def load_mel(path, hparams):
+    if not os.path.exists(path.split('.')[0] + '.npy'):
+        melspec = librosa.power_to_db(
+            librosa.feature.melspectrogram(librosa.load(path)[0],
+                                           sr=hparams.sampling_rate, n_fft=hparams.filter_length,
+                                           n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
+            ref=np.max)
+        np.save(path.split('.')[0] + '.npy', melspec)
+    return path.split('.')[0] + '.npy'
+
+
+def prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset):
     train_filepaths, train_speakers, train_emotions = load_vesus('filelists/vesus_train.txt', vesus_path,
                                                                  use_intended_labels=use_intended_labels,
                                                                  use_text=False)
@@ -211,18 +218,18 @@ def prepare_data(vesus_path, use_intended_labels, batch_size):
                                                               use_intended_labels=use_intended_labels, use_text=False)
     train_filepaths, val_filepaths, test_filepaths = load_npy_mels([train_filepaths, val_filepaths, test_filepaths])
 
-    train_loader = DataLoader(MelLoader(train_filepaths, train_emotions), num_workers=0, shuffle=True,
+    train_loader = DataLoader(MelLoader(train_filepaths, train_emotions, mel_offset), num_workers=0, shuffle=True,
                               batch_size=batch_size, pin_memory=False, drop_last=True, collate_fn=MelLoaderCollate())
 
-    val_loader = DataLoader(MelLoader(val_filepaths, train_emotions), num_workers=0,
+    val_loader = DataLoader(MelLoader(val_filepaths, train_emotions, mel_offset), num_workers=0,
                             shuffle=False, batch_size=batch_size, pin_memory=False, collate_fn=MelLoaderCollate())
-    test_loader = MelLoader(test_filepaths, train_emotions)
+    test_loader = MelLoader(test_filepaths, train_emotions, mel_offset)
 
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision):
-    train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size)
+def train(vesus_path, use_intended_labels, epochs, learning_rate, batch_size, n_frames, name, precision, mel_offset):
+    train_loader, val_loader, test_loader = prepare_data(vesus_path, use_intended_labels, batch_size, mel_offset)
     criterion = torch.nn.MSELoss()
     if use_intended_labels:
         criterion = torch.nn.BCELoss()
@@ -257,6 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
     parser.add_argument('--precision', type=int, default=32, help='Precision 32/16 bits')
+    parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
 
     args = parser.parse_args()
     name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
@@ -264,4 +272,4 @@ if __name__ == '__main__':
     # wandb.init(project="Classifier", config=args, name=name)
 
     train(args.vesus_path, args.use_intended_labels, args.epochs, args.lr, args.batch_size, args.n_frames, name,
-          args.precision)
+          args.precision, args.mel_offset)
