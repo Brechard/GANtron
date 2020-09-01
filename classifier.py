@@ -98,7 +98,7 @@ class Classifier(pl.LightningModule, ABC):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams['lr'])
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.hparams['epochs'],
-                                                                  eta_min=1e-8, last_epoch=-1)
+                                                                  eta_min=1e-6, last_epoch=-1)
         return [optimizer], [lr_scheduler]
 
     def training_step(self, batch, batch_idx):
