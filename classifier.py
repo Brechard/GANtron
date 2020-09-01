@@ -214,7 +214,7 @@ def train(vesus_path, hparams):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vesus_path', type=str, required=True, help='Path to audio files')
+    parser.add_argument('--vesus_path', type=str, required=False, help='Path to audio files')
     parser.add_argument('--use_intended_labels', type=str2bool, default=True,
                         help='Use intended emotions instead of voted')
     parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
