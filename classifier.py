@@ -45,10 +45,10 @@ class Classifier(pl.LightningModule, ABC):
         super().__init__()
         self.hparams = hparams
         self.criterion = torch.nn.MSELoss()
-        if hparams['use_intended_labels']:
+        if hparams['use_labels'] == 'one' or hparams['use_labels'] == 'multi':
             self.criterion = torch.nn.BCEWithLogitsLoss()
 
-        self.val_log = "Validation loss - " + ("Intended" if hparams['use_intended_labels'] else "Calculated")
+        self.val_log = "Validation loss - " + ("Intended" if hparams['use_labels'] else "Calculated")
         if hparams['linear_model']:
             self.model = torch.nn.Sequential(
                 module(hparams['n_mel_channels'] * hparams['n_frames'], hparams['model_size']),
