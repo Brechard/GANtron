@@ -14,14 +14,14 @@ class HParams:
         self.precision = 16
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
-        self.use_intended_labels = True
+        self.use_labels = 'one'
 
         ################################
         # Data Parameters             #
         ################################
-        self.training_files = 'filelists/vesus_train.txt'
-        self.validation_files = 'filelists/vesus_val.txt'
-        self.test_files = 'filelists/vesus_test.txt'
+        self.training_files = ['filelists/vesus_train.txt', 'filelists/cremad_train.txt', 'filelists/ravdess_train.txt']
+        self.validation_files = ['filelists/vesus_val.txt', 'filelists/cremad_val.txt', 'filelists/ravdess_val.txt']
+        self.test_files = ['filelists/vesus_test.txt', 'filelists/cremad_test.txt', 'filelists/ravdess_test.txt']
         self.n_emotions = 5
 
         ################################

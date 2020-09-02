@@ -78,7 +78,20 @@ def calculate_emotions(labeled_emotions, labeled_intensities):
     return emotions
 
 
-def load_vesus(filename, wavs_path, split="|", use_intended_labels=False, use_text=True):
+def load_vesus(filename: str, wavs_path: str, split: str = "|", use_labels: bool = 'one', use_text: bool = True):
+    """
+
+    Args:
+        filename: File with the information
+        wavs_path: Path to add to the one in the file
+        split: What is used to separate the elements
+        use_labels: can be either 'one' (maximum of the voted), 'intended' (what actor was supposed to do) or
+        'multi' (result of calculated emotions)
+        use_text: Include the text in the filepaths_and_text or not
+
+    Returns:
+        filepaths_and_text, speakers, emotions
+    """
     speakers, emotions = [], []
     vesus_ids = {
         "Neutral": [1, 0, 0, 0, 0],
@@ -96,11 +109,57 @@ def load_vesus(filename, wavs_path, split="|", use_intended_labels=False, use_te
                 filepath = [filepath, l[1]]
             filepaths_and_text.append(filepath)
             speakers.append(int(l[2]))
-            if use_intended_labels:
+            if use_labels == 'one':
+                labels = [float(i) for i in l[3].split(',')]
+                chosen = np.argmax(labels)
+                labels = np.zeros(len(labels))
+                labels[chosen] = 1
+                emotions.append(labels)
+            elif use_labels == 'intended':
                 emotions.append(vesus_ids[l[0].split('/')[1]])
             else:
                 emotions.append([float(i) for i in l[3].split(',')])
     return filepaths_and_text, speakers, emotions
+
+
+def load_cremad_ravdess(filename, wavs_path, use_labels, crema: bool):
+    if crema:
+        from_ids = {
+            "NEU": [1, 0, 0, 0, 0],
+            "ANG": [0, 1, 0, 0, 0],
+            "HAP": [0, 0, 1, 0, 0],
+            "Sad": [0, 0, 0, 1, 0],
+            "FEA": [0, 0, 0, 0, 1]
+        }
+    else:
+        from_ids = {
+            '01': [1, 0, 0, 0, 0],  # Neutral
+            '05': [0, 1, 0, 0, 0],  # Anger
+            '03': [0, 0, 1, 0, 0],  # Happiness
+            '04': [0, 0, 0, 1, 0],  # Sadness
+            '06': [0, 0, 0, 0, 1]  # Fear
+        }
+
+    with open(filename, encoding='utf-8') as f:
+        filepaths, emotions = [], []
+        for line in f:
+            l = line.strip().split('|')
+            if use_labels == 'one':
+                labels = [float(i) for i in l[1].split(',')]
+                chosen = np.argmax(labels)
+                labels = np.zeros(len(labels))
+                labels[chosen] = 1
+                emotions.append(labels)
+            elif use_labels == 'intended':
+                emo_id = l[0].split('-')[2]
+                if emo_id not in from_ids:
+                    continue
+                emotions.append(from_ids[emo_id])
+            else:
+                emotions.append([float(i) for i in l[1].split(',')])
+            filepaths.append(wavs_path + l[0])
+
+    return filepaths, emotions
 
 
 def load_vesus_full(vesus_path):

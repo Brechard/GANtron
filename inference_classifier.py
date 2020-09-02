@@ -31,11 +31,28 @@ if __name__ == '__main__':
     model.eval()
     if hparams_classifier.precision == 16:
         model = model.half()
+    import os
+    for p in os.listdir(args.path):
+        if '.wav' not in p:
+            continue
+        melspec = librosa.power_to_db(
+            librosa.feature.melspectrogram(librosa.load(args.path + p)[0],
+                                           sr=args.sr, n_fft=1024, n_mels=80, hop_length=256),
+            ref=np.max) / 80 + 1
+        melspec2 = melspec[:, -hparams_classifier.n_frames:]
+        if melspec2.shape[1] < hparams_classifier.n_frames:
+            melspec2 = torch.zeros(80, hparams_classifier.n_frames)
+            melspec2[:, :melspec.shape[1]] = torch.FloatTensor(melspec)
+        inference = model.inference(torch.FloatTensor(melspec2).cuda().half().unsqueeze(0))
+        print(f"Inferred emotions is: {id_to_emotion[np.argmax(inference.cpu().detach().numpy())]}")
 
-    melspec = librosa.power_to_db(
-        librosa.feature.melspectrogram(librosa.load(args.path)[0],
-                                       sr=args.sr, n_fft=1024, n_mels=80, hop_length=256),
-        ref=np.max) / 80 + 1
-    melspec2 = melspec[:, hparams_classifier.mel_offset:hparams_classifier.mel_offset + hparams_classifier.n_frames]
-    inference = model.inference(torch.FloatTensor(melspec2).cuda().half().unsqueeze(0))
-    print(f"Inferred emotions is: {id_to_emotion[np.argmax(inference.cpu().detach().numpy())]}")
+    #     a = 1
+    #
+    # melspec = librosa.power_to_db(
+    #     librosa.feature.melspectrogram(librosa.load(args.path)[0],
+    #                                    sr=args.sr, n_fft=1024, n_mels=80, hop_length=256),
+    #     ref=np.max) / 80 + 1
+    # melspec2 = melspec[:, -hparams_classifier.n_frames:]
+    #
+    # inference = model.inference(torch.FloatTensor(melspec2).cuda().half().unsqueeze(0))
+    # print(f"Inferred emotions is: {id_to_emotion[np.argmax(inference.cpu().detach().numpy())]}")

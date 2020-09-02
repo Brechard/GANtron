@@ -1,4 +1,5 @@
 import random
+from random import shuffle
 
 import numpy as np
 import torch
@@ -7,7 +8,6 @@ import torch.utils.data
 import layers
 from text import text_to_sequence
 from utils import load_wav_to_torch, load_filepaths_and_text, load_vesus
-from random import shuffle
 
 
 class TextMelLoader(torch.utils.data.Dataset):
@@ -140,12 +140,17 @@ class MelLoader(torch.utils.data.Dataset):
         self.indexes = list(range(len(mel_paths)))
         shuffle(self.indexes)
 
+    def add_noise(self, mel):
+        mel = mel + np.random.random(mel.shape)
+        mel[mel > 0] = 0
+        mel[mel < -80] = -80
+        return mel
+
     def get_mel(self, path):
         mel = np.load(path, allow_pickle=True)[:, self.mel_offset:]
+        mel = self.add_noise(mel)
         normalized_mel = mel / 80 + 1
         return torch.FloatTensor(normalized_mel)
-
-        # return torch.FloatTensor(np.load(path, allow_pickle=True))
 
     def __getitem__(self, index):
         path = self.mel_paths[self.indexes[index]]
@@ -176,5 +181,3 @@ class MelLoaderCollate:
             emotions[i] = batch[ids_sorted_decreasing[i]][1]
 
         return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
-
-

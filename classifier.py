@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from data_utils import MelLoader, MelLoaderCollate
 from hparams_classifier import HParams
-from utils import load_vesus, str2bool
+from utils import load_vesus, load_cremad_ravdess, str2bool
 
 
 def module(size_in, size_out):
@@ -157,10 +157,12 @@ def load_npy_mels(filepaths_list, hparams):
         progress_bar = tqdm(filepath)
         progress_bar.set_description(f'Loading file {n}/{len(filepaths_list)}')
         new_filepaths_list = []
+        a = 0
         for path in tqdm(filepath):
-            new_filepaths_list.append(path.split('.')[0] + '.npy')
             if not os.path.exists(path.split('.')[0] + '.npy'):
-                load_mel(path.split('.')[0] + '.npy', hparams)
+                load_mel(path, hparams)
+            new_filepaths_list.append(path.split('.')[0] + '.npy')
+            a += 1
         new_filepaths_lists.append(new_filepaths_list)
 
     return new_filepaths_lists
@@ -175,15 +177,25 @@ def load_mel(path, hparams):
     np.save(path.split('.')[0] + '.npy', melspec)
 
 
-def prepare_data(vesus_path, hparams):
-    use_intended_labels, mel_offset, bs = hparams.use_intended_labels, hparams.mel_offset, hparams.batch_size
-    train_filepaths, train_speakers, train_emotions = load_vesus(hparams.training_files, vesus_path,
-                                                                 use_intended_labels=use_intended_labels,
-                                                                 use_text=False)
-    val_filepaths, val_speakers, val_emotions = load_vesus(hparams.validation_files, vesus_path,
-                                                           use_intended_labels=use_intended_labels, use_text=False)
-    test_filepaths, test_speakers, test_emotions = load_vesus(hparams.test_files, vesus_path,
-                                                              use_intended_labels=use_intended_labels, use_text=False)
+def load_files(files, audio_path, use_labels):
+    filepaths, _, emotions = load_vesus(files[0], audio_path + '/VESUS/Audio/',
+                                                    use_labels=use_labels, use_text=False)
+    cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
+                                                 use_labels=use_labels, crema=True)
+    filepaths.extend(cremad_file)
+    emotions.extend(cremad_em)
+    ravdess_file, ravdess_em = load_cremad_ravdess(files[2], audio_path + '/RAVDESS/Speech/',
+                                                   use_labels=use_labels, crema=False)
+    filepaths.extend(ravdess_file)
+    emotions.extend(ravdess_em)
+    return filepaths, emotions
+
+
+def prepare_data(audio_path, hparams):
+    use_labels, mel_offset, bs = hparams.use_labels, hparams.mel_offset, hparams.batch_size
+    train_filepaths, train_emotions = load_files(hparams.training_files, audio_path, hparams.use_labels)
+    val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels)
+    test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels)
     train_filepaths, val_filepaths, test_filepaths = load_npy_mels([train_filepaths, val_filepaths, test_filepaths],
                                                                    hparams)
 
@@ -198,8 +210,8 @@ def prepare_data(vesus_path, hparams):
     return train_loader, val_loader, test_loader
 
 
-def train(vesus_path, hparams):
-    train_loader, val_loader, test_loader = prepare_data(vesus_path, hparams)
+def train(audio_path, hparams):
+    train_loader, val_loader, test_loader = prepare_data(audio_path, hparams)
 
     model = Classifier(hparams.__dict__)
 
@@ -214,9 +226,10 @@ def train(vesus_path, hparams):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vesus_path', type=str, required=False, help='Path to audio files')
-    parser.add_argument('--use_intended_labels', type=str2bool, default=True,
-                        help='Use intended emotions instead of voted')
+    parser.add_argument('--audio_path', type=str, required=False, help='Path to audio files')
+    parser.add_argument('--use_labels', type=str, default='one', help="can be either \'one\' (maximum of the voted), "
+                                                                      "\'intended\' (what actor was supposed to do) or"
+                                                                      "\'multi\' (result of calculated emotions)")
     parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=64,
@@ -229,14 +242,14 @@ if __name__ == '__main__':
     parser.add_argument('--hparams', type=str, default='', help='Comma separated name=value pairs')
 
     args = parser.parse_args()
-    name = f'{args.batch_size}bs-{args.n_frames}nFrames-{args.lr}LR' \
-           f'-{args.model_size}{"linear" if args.linear_model else "conv"}' \
-           f'{"-intendedLabels" if args.use_intended_labels else ""}'
-    # wandb.init(project="Classifier", config=args, name=name)
     hp = HParams(args.hparams)
     hp.add_params(args)
-    args.vesus_path = 'C:/Users/rodri/Datasets/Vesus/Audio/'
+    name = f'3DS-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
+           f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
+           f'-{hp.use_labels}'
+    # wandb.init(project="Classifier", config=args, name=name)
+    args.audio_path = 'C:/Users/rodri/Datasets/'
     if not hp.linear_model and hp.n_frames % 8 != 0:
         raise argparse.ArgumentTypeError("Due to the three MaxPool layers, n_frames must be a multiple of 8")
 
-    train(args.vesus_path, hp)
+    train(args.audio_path, hp)
