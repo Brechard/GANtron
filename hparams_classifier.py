@@ -48,17 +48,24 @@ class HParams:
         self.batch_size = 32
 
         if hparams_string:
-            for param in hparams_string.split(','):
-                key, value = param.split('=')
-                if '/' in value:
-                    self.add_param(key, value)
-                else:
-                    self.add_param(key, ast.literal_eval(value))
+            self.add_params_string(hparams_string)
+
+    def add_params_string(self, hparams_string):
+        for param in hparams_string.split(','):
+            key, value = param.split('=')
+            if '/' in value:
+                self.add_param(key, value)
+            else:
+                self.add_param(key, ast.literal_eval(value))
 
     def add_param(self, param, value):
         self.__setattr__(param, value)
 
     def add_params(self, params):
+        if type(params) is str:
+            self.add_params_string(params)
+            return
+
         if type(params) is argparse.Namespace:
             params = params.__dict__
 

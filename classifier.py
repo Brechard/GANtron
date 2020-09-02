@@ -242,8 +242,10 @@ if __name__ == '__main__':
     parser.add_argument('--hparams', type=str, default='', help='Comma separated name=value pairs')
 
     args = parser.parse_args()
-    hp = HParams(args.hparams)
+    hp = HParams()
     hp.add_params(args)
+    hp.add_params(args.hparams)
+
     name = f'3DS-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
            f'-{hp.use_labels}'
