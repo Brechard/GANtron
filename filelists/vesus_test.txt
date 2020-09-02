@@ -1,0 +1,200 @@
+2/Sad/34.wav|Oceans|2|0, 0, 0, 0.72, 0.16
+1/Happy/148.wav|A rabbit hopped down|1|0.08, 0.24, 0.36, 0, 0
+7/Neutral/154.wav|Hills are tall|7|0.7, 0.04, 0.06, 0, 0
+6/Sad/34.wav|Oceans|6|0.4, 0, 0, 0.38, 0.08
+10/Neutral/179.wav|Seven million eight|10|0.82, 0.04, 0, 0, 0
+10/Neutral/136.wav|The whale dived deep|10|0.62, 0, 0.04, 0.04, 0
+1/Angry/141.wav|Our pigs like mud|1|0, 0.9, 0, 0, 0
+1/Neutral/228.wav|The stone is gray|1|0.6, 0.06, 0, 0.1, 0
+7/Fearful/212.wav|Authorized requirement representatives|7|0, 0, 0.08, 0.52, 0.28
+10/Happy/33.wav|Mountains|10|0.2, 0.26, 0.2, 0, 0.04
+1/Happy/215.wav|Non-convex optimization problem|1|0.08, 0, 0.9, 0, 0
+1/Sad/82.wav|Emma used money|1|0, 0, 0, 0.88, 0.1
+2/Fearful/212.wav|Authorized requirement representatives|2|0, 0, 0, 0, 0.76
+10/Fearful/20.wav|Fourteen|10|0, 0.22, 0, 0.02, 0.4
+7/Angry/175.wav|One hundred seven|7|0, 0.96, 0, 0, 0
+7/Neutral/191.wav|Two thousand thirteen|7|0.64, 0, 0.2, 0, 0
+8/Angry/182.wav|Ten million three|8|0.68, 0.08, 0, 0.04, 0
+7/Sad/31.wav|Rivers|7|0.48, 0, 0, 0.38, 0
+8/Happy/126.wav|A lion hunt prey|8|0.3, 0, 0.5800000000000001, 0, 0
+6/Happy/200.wav|Eighteenth of may|6|0.7, 0, 0, 0.14, 0
+9/Sad/24.wav|Six|9|0.2, 0, 0, 0.72, 0
+10/Neutral/51.wav|Mary ran well|10|0.7, 0.1, 0.02, 0, 0
+2/Happy/233.wav|I hate him|2|0, 0.92, 0, 0, 0
+3/Happy/165.wav|Canyons are large|3|0.28, 0, 0.46, 0, 0
+6/Sad/19.wav|Four|6|0.3, 0, 0, 0.6, 0
+9/Happy/32.wav|Boulders|9|0.46, 0.08, 0, 0.28, 0
+2/Sad/222.wav|Her carrot is orange|2|0.06, 0, 0, 0.38, 0.42
+6/Fearful/156.wav|Glaciers are cold|6|0.28, 0.04, 0.06, 0.12, 0.1
+7/Happy/51.wav|Mary ran well|7|0, 0, 0.9, 0, 0
+10/Fearful/226.wav|Their chocolate is brown|10|0.1, 0.24, 0.08, 0.2, 0.12
+4/Angry/84.wav|Olivia saw james|4|0.36, 0.08, 0.24, 0, 0.14
+1/Angry/167.wav|Swamps are humid|1|0, 1.0, 0, 0, 0
+10/Sad/51.wav|Mary ran well|10|0, 0, 0, 0.82, 0.08
+7/Happy/52.wav|She eats quickly|7|0.14, 0.04, 0.54, 0, 0
+7/Angry/212.wav|Authorized requirement representatives|7|0, 1.0, 0, 0, 0
+7/Sad/226.wav|Their chocolate is brown|7|0.4, 0.12, 0, 0.14, 0
+1/Happy/200.wav|Eighteenth of may|1|0, 0, 0.66, 0.16, 0
+8/Neutral/85.wav|James sat down|8|0.76, 0.04, 0, 0, 0
+2/Fearful/68.wav|Vampires are bloodsuckers|2|0, 0, 0, 0.08, 0.82
+2/Fearful/177.wav|Nine hundred four|2|0, 0.06, 0, 0.08, 0.74
+5/Angry/218.wav|The water is blue|5|0, 0.84, 0, 0, 0
+5/Angry/125.wav|The elephants walk loudly|5|0, 0.98, 0, 0, 0
+5/Angry/58.wav|Elliot walks briskly|5|0, 0.84, 0.08, 0, 0
+5/Neutral/245.wav|My goldfish died|5|0.24, 0, 0, 0.5, 0
+4/Neutral/92.wav|Lisa made comment|4|0.64, 0.18, 0, 0, 0
+6/Sad/212.wav|Authorized requirement representatives|6|0.64, 0, 0.06, 0.16, 0
+1/Angry/67.wav|Leslie called home|1|0.1, 0.76, 0, 0, 0
+8/Angry/61.wav|Dan sits down|8|0.48, 0.18, 0, 0.06, 0
+8/Neutral/206.wav|October fifteenth|8|0.78, 0, 0, 0.16, 0
+6/Fearful/91.wav|Rob writes music|6|0.18, 0, 0.74, 0, 0
+3/Angry/204.wav|March thirteenth|3|0.9, 0, 0, 0.06, 0
+10/Angry/163.wav|Ponds are small|10|0, 0.9, 0, 0, 0
+3/Neutral/77.wav|Convoy got looted|3|0.64, 0.08, 0, 0.14, 0
+3/Sad/252.wav|What was that|3|0.16, 0, 0, 0.62, 0.08
+3/Angry/172.wav|Five thousand two|3|0.3, 0.2, 0.3, 0.1, 0
+4/Fearful/11.wav|Gray|4|0.74, 0.06, 0, 0, 0
+9/Fearful/90.wav|People email data|9|0, 0, 0, 0.24, 0.6
+2/Angry/135.wav|The meerkats keep guard|2|0, 0.7, 0, 0, 0.16
+5/Fearful/133.wav|A giraffe consumes leaves|5|0, 0.16, 0, 0.14, 0.52
+4/Neutral/136.wav|The whale dived deep|4|0.64, 0, 0, 0.14, 0
+2/Neutral/241.wav|Got the job|2|0.8, 0.04, 0, 0, 0
+5/Happy/240.wav|Look, free food|5|0, 0, 0.92, 0, 0
+3/Sad/30.wav|Thirteen|3|0.3, 0, 0, 0.62, 0
+4/Happy/232.wav|The ocean is teal|4|0.66, 0, 0.22, 0, 0
+3/Neutral/220.wav|Our grass is green|3|0.8, 0, 0, 0.12, 0
+3/Neutral/88.wav|She brewed tea|3|0.72, 0.04, 0.02, 0, 0
+10/Sad/183.wav|Thirteen million one|10|0.08, 0.16, 0.1, 0.44, 0
+9/Happy/119.wav|We are champions|9|0.36, 0, 0.1, 0.38, 0
+5/Fearful/65.wav|Christy jumps high|5|0, 0, 0.08, 0.1, 0.68
+4/Happy/236.wav|You are stupid|4|0.24, 0.26, 0.24, 0, 0
+5/Neutral/80.wav|We count numbers|5|0.78, 0, 0, 0.08, 0
+1/Sad/14.wav|Cyan|1|0.48, 0, 0.04, 0.14, 0.06
+5/Neutral/214.wav|Parametric image registration|5|0.94, 0, 0, 0, 0
+2/Neutral/148.wav|A rabbit hopped down|2|0.68, 0.14, 0, 0, 0
+4/Angry/231.wav|His gem is cyan|4|0.26, 0.26, 0.04, 0.08, 0.04
+4/Sad/149.wav|The horse won a race|4|0.78, 0, 0, 0.1, 0
+7/Happy/229.wav|My cat is black|7|0, 0, 0.92, 0, 0
+4/Neutral/29.wav|Five|4|0.9, 0, 0, 0, 0
+1/Sad/106.wav|Jeff writes novellas|1|0.1, 0, 0, 0.5800000000000001, 0.14
+4/Happy/229.wav|My cat is black|4|0.32, 0, 0.46, 0, 0
+4/Angry/96.wav|Eric phoned boss|4|0.6, 0.12, 0, 0, 0
+4/Sad/128.wav|A bear protects her cubs|4|0.5, 0, 0, 0.24, 0
+10/Neutral/46.wav|She ran fast|10|0.9, 0, 0, 0, 0
+7/Fearful/188.wav|Fifteen billion seven|7|0, 0, 0, 0.44, 0.48
+10/Neutral/189.wav|Eight million nine|10|0.9, 0, 0, 0, 0
+1/Neutral/234.wav|They are mean|1|0.58, 0, 0, 0.18, 0
+5/Neutral/72.wav|Joker was chaotic|5|0.62, 0, 0, 0.16, 0
+1/Neutral/131.wav|A fly moves swiftly|1|0.78, 0, 0, 0, 0.04
+6/Happy/197.wav|Seventh of october|6|0.88, 0, 0, 0, 0
+8/Sad/9.wav|Brown|8|0, 0, 0, 0.78, 0
+3/Sad/243.wav|It’s raining out|3|0, 0, 0, 0.92, 0
+2/Sad/210.wav|Compensation characteristics chemistry|2|0, 0, 0, 1.0, 0
+5/Happy/174.wav|Eight thousand five|5|0.3, 0, 0.56, 0, 0
+10/Angry/30.wav|Thirteen|10|0, 0.62, 0.28, 0, 0
+10/Happy/74.wav|Autobots got dry-cleaned|10|0.2, 0.08, 0.54, 0, 0
+5/Sad/111.wav|Jake pets dog|5|0, 0, 0, 0.64, 0.3
+9/Angry/33.wav|Mountains|9|0, 0.78, 0.08, 0, 0
+5/Angry/225.wav|His gum is pink|5|0, 0.98, 0, 0, 0
+9/Sad/155.wav|Forests are dense|9|0.2, 0.04, 0, 0.54, 0
+1/Neutral/12.wav|Black|1|0.7, 0, 0.06, 0, 0.08
+1/Sad/159.wav|Caves are dark|1|0, 0, 0, 0.28, 0.66
+9/Angry/72.wav|Joker was chaotic|9|0.1, 0.34, 0.12, 0, 0
+9/Neutral/167.wav|Swamps are humid|9|0.88, 0, 0.06, 0, 0
+9/Happy/191.wav|Two thousand thirteen|9|0.36, 0, 0, 0.36, 0
+3/Fearful/229.wav|My cat is black|3|0.36, 0, 0, 0.28, 0
+9/Fearful/22.wav|Eight|9|0.08, 0, 0, 0.46, 0.28
+9/Happy/221.wav|A tomato is red|9|0.78, 0, 0.06, 0, 0
+6/Neutral/202.wav|First of january|6|0.14, 0, 0, 0.66, 0
+9/Happy/177.wav|Nine hundred four|9|0.5800000000000001, 0.04, 0, 0.1, 0
+6/Fearful/182.wav|Ten million three|6|0.68, 0, 0, 0.04, 0
+3/Sad/119.wav|We are champions|3|0.16, 0, 0, 0.68, 0
+7/Happy/48.wav|William sang before|7|0, 0, 0.98, 0, 0
+7/Happy/42.wav|Canyons|7|0, 0, 0.78, 0, 0
+7/Sad/205.wav|April second|7|0.2, 0, 0, 0.72, 0
+9/Angry/206.wav|October fifteenth|9|0, 0.98, 0, 0, 0
+3/Fearful/19.wav|Four|3|0.46, 0, 0, 0.38, 0
+8/Happy/162.wav|Seas are wide|8|0.88, 0, 0, 0.04, 0
+9/Neutral/109.wav|We make bricks|9|0.68, 0, 0, 0.08, 0
+9/Angry/49.wav|James took long|9|0, 0.94, 0, 0, 0
+3/Fearful/149.wav|The horse won a race|3|0.1, 0, 0, 0.7, 0
+2/Neutral/138.wav|Penguins fly nowhere|2|0.78, 0.06, 0, 0, 0
+2/Fearful/99.wav|Chris posted link|2|0.42, 0.06, 0, 0.06, 0.2
+10/Neutral/91.wav|Rob writes music|10|0.64, 0.2, 0, 0, 0
+6/Neutral/214.wav|Parametric image registration|6|0.94, 0, 0, 0, 0
+10/Fearful/252.wav|What was that|10|0.08, 0, 0.1, 0, 0.76
+2/Sad/218.wav|The water is blue|2|0, 0, 0, 0.26, 0.56
+3/Fearful/114.wav|I asked questions|3|0, 0, 0, 0.74, 0.1
+10/Sad/79.wav|I drove home|10|0, 0, 0, 0.72, 0.14
+10/Happy/9.wav|Brown|10|0.18, 0, 0.58, 0, 0
+10/Sad/62.wav|Sam eats slow|10|0, 0, 0, 0.94, 0
+2/Fearful/248.wav|You’re scaring me|2|0, 0, 0, 0, 0.96
+3/Sad/69.wav|Victor had breakup|3|0, 0, 0, 0.86, 0.06
+9/Angry/11.wav|Gray|9|0.12, 0.68, 0.08, 0, 0
+4/Sad/131.wav|A fly moves swiftly|4|0.78, 0, 0, 0.1, 0
+4/Happy/201.wav|Fourth of july|4|0.34, 0, 0.58, 0, 0
+8/Angry/48.wav|William sang before|8|0.6, 0.1, 0, 0.06, 0
+4/Happy/116.wav|I accept failures|4|0.34, 0.2, 0.34, 0, 0
+7/Happy/191.wav|Two thousand thirteen|7|0.14, 0.08, 0.5800000000000001, 0, 0
+3/Neutral/28.wav|Fifteen|3|0.74, 0, 0.1, 0.06, 0
+6/Angry/239.wav|They finished first|6|0.08, 0.64, 0, 0, 0
+10/Sad/209.wav|Preparations encyclopedia mathematics|10|0.3, 0, 0, 0.26, 0.26
+7/Happy/113.wav|Rick rakes leaves|7|0.08, 0, 0.72, 0, 0
+4/Happy/41.wav|Valleys|4|0.54, 0.08, 0.16, 0, 0
+1/Fearful/233.wav|I hate him|1|0, 0.2, 0, 0.78, 0
+10/Fearful/135.wav|The meerkats keep guard|10|0.1, 0.16, 0, 0, 0.54
+5/Neutral/146.wav|An ant built a hill|5|0.84, 0.04, 0, 0, 0
+6/Happy/91.wav|Rob writes music|6|0.62, 0, 0.16, 0, 0
+3/Sad/115.wav|Adults don’t fight|3|0.08, 0, 0, 0.52, 0.12
+4/Fearful/205.wav|April second|4|0.46, 0, 0, 0, 0.28
+2/Angry/232.wav|The ocean is teal|2|0, 0.94, 0, 0, 0
+7/Sad/157.wav|Plains are flat|7|0.38, 0.06, 0, 0.2, 0
+8/Angry/93.wav|Carol designed map|8|0.86, 0.06, 0, 0, 0
+3/Angry/251.wav|The engine failed|3|0.2, 0.46, 0.06, 0.08, 0
+9/Angry/129.wav|My gecko climbs a tree|9|0.08, 0.8, 0, 0, 0
+5/Happy/88.wav|She brewed tea|5|0.26, 0, 0.52, 0, 0
+7/Sad/200.wav|Eighteenth of may|7|0, 0, 0, 0.7, 0.18
+7/Sad/110.wav|They smell bread|7|0, 0, 0, 0.84, 0
+5/Sad/20.wav|Fourteen|5|0, 0, 0, 0.6, 0.32
+4/Neutral/4.wav|Red|4|0.74, 0.12, 0, 0, 0
+4/Sad/184.wav|Eleven thousand two|4|0.46, 0, 0, 0.32, 0
+5/Fearful/72.wav|Joker was chaotic|5|0, 0, 0, 0, 0.96
+5/Happy/45.wav|Plateaus|5|0.56, 0, 0.36, 0, 0
+7/Angry/82.wav|Emma used money|7|0, 0.96, 0, 0, 0
+6/Neutral/44.wav|Deserts|6|0.4, 0.06, 0, 0.44, 0
+3/Angry/73.wav|Lee made collage|3|0.72, 0, 0, 0.02, 0
+3/Fearful/131.wav|A fly moves swiftly|3|0.34, 0, 0, 0.38, 0.08
+9/Happy/115.wav|Adults don’t fight|9|0.5800000000000001, 0.06, 0, 0.14, 0
+6/Happy/34.wav|Oceans|6|0.62, 0.06, 0.08, 0, 0.06
+1/Happy/16.wav|Ten|1|0.18, 0.04, 0.1, 0.1, 0.12
+6/Fearful/58.wav|Elliot walks briskly|6|0.72, 0.08, 0, 0, 0.02
+8/Fearful/120.wav|Stars aligned perfectly|8|0.56, 0, 0.1, 0.08, 0
+8/Fearful/217.wav|Separating fiscal responsibility|8|0.68, 0, 0.04, 0.04, 0
+2/Happy/102.wav|Children attend school|2|0, 0.32, 0.42, 0, 0
+4/Happy/94.wav|Ruth checked report|4|0.74, 0, 0.18, 0, 0
+4/Sad/54.wav|I am full|4|0.3, 0, 0, 0.5800000000000001, 0
+1/Neutral/134.wav|A jellyfish floats past|1|0.8, 0, 0, 0.08, 0
+4/Fearful/192.wav|April twenty-third|4|0.36, 0, 0.06, 0, 0.38
+6/Angry/49.wav|James took long|6|0.72, 0.08, 0, 0, 0.06
+1/Fearful/52.wav|She eats quickly|1|0, 0, 0.1, 0, 0.64
+6/Sad/67.wav|Leslie called home|6|0.54, 0, 0, 0.32, 0
+8/Happy/110.wav|They smell bread|8|0.46, 0, 0, 0.24, 0.04
+10/Neutral/104.wav|Roy saves page|10|0.86, 0, 0, 0.1, 0
+4/Angry/25.wav|One|4|0.58, 0.06, 0, 0.08, 0.12
+2/Neutral/251.wav|The engine failed|2|0.48, 0.14, 0, 0.14, 0.04
+4/Fearful/27.wav|Twelve|4|0.32, 0.04, 0, 0.34, 0.1
+1/Neutral/188.wav|Fifteen billion seven|1|0.62, 0.02, 0.08, 0, 0
+2/Happy/107.wav|Sarah took notes|2|0.22, 0.16, 0.14, 0, 0.24
+7/Neutral/70.wav|Kramer is european|7|0.78, 0.12, 0, 0, 0
+6/Angry/184.wav|Eleven thousand two|6|0.3, 0.34, 0.02, 0, 0
+4/Neutral/230.wav|Her bird is indigo|4|0.56, 0, 0.14, 0, 0
+4/Happy/6.wav|Purple|4|0.46, 0, 0.28, 0, 0
+10/Neutral/105.wav|Sam hears everything|10|0.5, 0.14, 0.02, 0, 0
+4/Neutral/122.wav|Carl makes carpets|4|0.7, 0.12, 0, 0, 0
+5/Fearful/31.wav|Rivers|5|0, 0, 0, 0.76, 0.14
+6/Happy/146.wav|An ant built a hill|6|0.34, 0, 0.52, 0, 0
+4/Neutral/26.wav|Three|4|0.58, 0, 0, 0.34, 0
+8/Neutral/137.wav|My parrot repeated words|8|0.78, 0.14, 0, 0, 0
+8/Neutral/199.wav|November twentieth|8|0.72, 0, 0.04, 0.02, 0
+8/Angry/171.wav|Playgrounds are empty|8|0.6, 0, 0, 0.28, 0
+1/Angry/32.wav|Boulders|1|0, 0.96, 0, 0, 0

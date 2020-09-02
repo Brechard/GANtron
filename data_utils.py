@@ -1,11 +1,13 @@
 import random
+
 import numpy as np
 import torch
 import torch.utils.data
 
 import layers
-from utils import load_wav_to_torch, load_filepaths_and_text
 from text import text_to_sequence
+from utils import load_wav_to_torch, load_filepaths_and_text, load_vesus
+from random import shuffle
 
 
 class TextMelLoader(torch.utils.data.Dataset):
@@ -14,36 +16,44 @@ class TextMelLoader(torch.utils.data.Dataset):
         2) normalizes text and converts them to sequences of one-hot vectors
         3) computes mel-spectrograms from audio files.
     """
+
     def __init__(self, audiopaths_and_text, hparams, wavs_path):
-        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text, wavs_path)
+        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text[0], wavs_path)
+
+        self.vesus = False
+        if hparams.vesus_path:
+            self.vesus = True
+            audiopaths_and_text, speakers, emotions = load_vesus(audiopaths_and_text[1], hparams.vesus_path,
+                                                                 use_intended_labels=hparams.use_intended_labels)
+            self.speakers = torch.IntTensor([0] * len(self.audiopaths_and_text) + speakers)
+            self.emotions = torch.FloatTensor([[0, 0, 0, 0, 0]] * len(self.audiopaths_and_text) + emotions)
+            self.audiopaths_and_text.extend(audiopaths_and_text)
+
         self.text_cleaners = hparams.text_cleaners
         self.max_wav_value = hparams.max_wav_value
         self.sampling_rate = hparams.sampling_rate
         self.load_mel_from_disk = hparams.load_mel_from_disk
+        self.idx = list(range(len(self.audiopaths_and_text)))
         self.stft = layers.TacotronSTFT(
             hparams.filter_length, hparams.hop_length, hparams.win_length,
             hparams.n_mel_channels, hparams.sampling_rate, hparams.mel_fmin,
             hparams.mel_fmax)
         random.seed(hparams.seed)
-        random.shuffle(self.audiopaths_and_text)
+        random.shuffle(self.idx)
 
     def get_mel_text_pair(self, audiopath_and_text):
         # separate filename and text
         audiopath, text = audiopath_and_text[0], audiopath_and_text[1]
         text = self.get_text(text)
         mel = self.get_mel(audiopath)
-        return (text, mel)
+        return text, mel
 
     def get_mel(self, filename):
         if not self.load_mel_from_disk:
-            audio, sampling_rate = load_wav_to_torch(filename)
-            if sampling_rate != self.stft.sampling_rate:
-                raise ValueError("{} {} SR doesn't match target {} SR".format(
-                    sampling_rate, self.stft.sampling_rate))
-            audio_norm = audio / self.max_wav_value
-            audio_norm = audio_norm.unsqueeze(0)
-            audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
-            melspec = self.stft.mel_spectrogram(audio_norm)
+            audio = load_wav_to_torch(filename, self.stft.sampling_rate)
+            audio = audio.unsqueeze(0)
+            audio = torch.autograd.Variable(audio, requires_grad=False)
+            melspec = self.stft.mel_spectrogram(audio)
             melspec = torch.squeeze(melspec, 0)
         else:
             melspec = torch.from_numpy(np.load(filename))
@@ -58,15 +68,20 @@ class TextMelLoader(torch.utils.data.Dataset):
         return text_norm
 
     def __getitem__(self, index):
-        return self.get_mel_text_pair(self.audiopaths_and_text[index])
+        idx = self.idx[index]
+        text, mel = self.get_mel_text_pair(self.audiopaths_and_text[idx])
+        if self.vesus:
+            return text, mel, self.speakers[idx], self.emotions[idx]
+
+        return text, mel
 
     def __len__(self):
         return len(self.audiopaths_and_text)
 
 
-class TextMelCollate():
-    """ Zero-pads model inputs and targets based on number of frames per setep
-    """
+class TextMelCollate:
+    """ Zero-pads model inputs and targets based on number of frames per step """
+
     def __init__(self, n_frames_per_step):
         self.n_frames_per_step = n_frames_per_step
 
@@ -74,7 +89,7 @@ class TextMelCollate():
         """Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
-        batch: [text_normalized, mel_normalized]
+        batch: [text_normalized, mel_normalized, speaker, emotions]
         """
         # Right zero-pad all one-hot text sequences to max input length
         input_lengths, ids_sorted_decreasing = torch.sort(
@@ -84,9 +99,14 @@ class TextMelCollate():
 
         text_padded = torch.LongTensor(len(batch), max_input_len)
         text_padded.zero_()
+        speaker_ids = torch.FloatTensor(len(batch))
+        emotions = torch.FloatTensor(len(batch), 5)
         for i in range(len(ids_sorted_decreasing)):
             text = batch[ids_sorted_decreasing[i]][0]
             text_padded[i, :text.size(0)] = text
+            if len(batch[0]) == 4:
+                speaker_ids[i] = batch[ids_sorted_decreasing[i]][-2]
+                emotions[i] = batch[ids_sorted_decreasing[i]][-1]
 
         # Right zero-pad mel-spec
         num_mels = batch[0][1].size(0)
@@ -104,8 +124,57 @@ class TextMelCollate():
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]][1]
             mel_padded[i, :, :mel.size(1)] = mel
-            gate_padded[i, mel.size(1)-1:] = 1
+            gate_padded[i, mel.size(1) - 1:] = 1
             output_lengths[i] = mel.size(1)
 
-        return text_padded, input_lengths, mel_padded, gate_padded, \
-            output_lengths
+        return text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, \
+               output_lengths
+
+
+class MelLoader(torch.utils.data.Dataset):
+    def __init__(self, mel_paths, emotions, mel_offset):
+        self.mel_paths = mel_paths
+        self.emotions = emotions
+        assert len(mel_paths) == len(emotions)
+        self.mel_offset = mel_offset
+        self.indexes = list(range(len(mel_paths)))
+        shuffle(self.indexes)
+
+    def get_mel(self, path):
+        mel = np.load(path, allow_pickle=True)[:, self.mel_offset:]
+        normalized_mel = mel / 80 + 1
+        return torch.FloatTensor(normalized_mel)
+
+        # return torch.FloatTensor(np.load(path, allow_pickle=True))
+
+    def __getitem__(self, index):
+        path = self.mel_paths[self.indexes[index]]
+        mel = self.get_mel(self.mel_paths[self.indexes[index]])
+        em = torch.FloatTensor(self.emotions[self.indexes[index]])
+        return mel, em
+
+    def __len__(self):
+        return len(self.mel_paths)
+
+
+class MelLoaderCollate:
+    """ DataLoader requires all elements of the batch to have the same size, so we pad them to 0. """
+
+    def __call__(self, batch):
+        input_lengths, ids_sorted_decreasing = torch.sort(
+            torch.LongTensor([len(x[0][0]) for x in batch]),
+            dim=0, descending=True)
+        max_input_len = input_lengths[0]
+        mel_padded = torch.FloatTensor(len(batch), len(batch[0][0]), max_input_len)
+        mel_padded.zero_()
+        emotions = torch.FloatTensor(len(batch), len(batch[0][1]))
+        emotions.zero_()
+
+        for i in range(len(ids_sorted_decreasing)):
+            mel = batch[ids_sorted_decreasing[i]][0]
+            mel_padded[i, :, :mel.size(1)] = mel
+            emotions[i] = batch[ids_sorted_decreasing[i]][1]
+
+        return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
+
+

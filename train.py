@@ -204,7 +204,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
     if rank == 0:
         print(f"{iteration} Validation mel loss {val_mel_loss} gate loss {val_gate_loss}")
         logger.log_validation(val_mel_loss, val_gate_loss, val_attn_loss, y, y_pred, input_lengths, output_lengths,
-                              iteration)
+                              iteration, args.waveglow_path)
     return val_mel_loss + val_gate_loss
 
 
@@ -371,9 +371,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                 if len(generated_mel_list) > hparams.d_freq:
                     generated_mel_list.pop(0)
 
-                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[4])
+                mel_loss, gate_loss, atten_loss = criterion(y_pred, y, x[1], x[-1])
                 taco_loss = mel_loss + gate_loss
-                adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
+                adv_loss = 0
+                if hparams.d_freq > 0:
+                    adv_loss = real * discriminator.adversarial_loss(generated_mel, generated_output_lengths)
                 total_loss = taco_loss + adv_loss
                 if iteration < hparams.attn_steps:
                     total_loss += 10 * atten_loss
@@ -411,7 +413,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                         logger.log_values(step=iteration, attention_loss=atten_loss)
 
                 gen_times += 1
-                if gen_times > hparams.g_freq:
+                if gen_times > hparams.g_freq and hparams.d_freq > 0:
                     gen_times = 0
                     disc_times = 1
 
@@ -434,6 +436,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                             os.remove(best_val_loss_path)
                         best_val_loss = val_loss
                         best_val_loss_path = checkpoint_path
+                    wandb.save(output_directory + '/*.pt')
 
                     prev_check = checkpoint_path
                 prev_val_loss = val_loss
@@ -447,6 +450,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
     parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
+    parser.add_argument('--waveglow_path', type=str, default=None, required=False, help='WaveGlow path to use in validation')
+    parser.add_argument('--vesus_path', type=str, default=None, help='Vesus dataset path to use')
     parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
     parser.add_argument('--rank', type=int, default=0, required=False, help='rank of current gpu')
@@ -461,13 +466,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
     hparams = HParams(args.hparams)
     hparams.add_params(args)
-    name = f'{"lD" if hparams.discriminator_type == "linear" else "cD"}' \
-           f'{"p-" if args.checkpoint_path is not None else ""}' \
-           f'{"fp16-" if hparams.fp16_run else ""}' \
-           f'{hparams.g_freq}g{hparams.d_freq}d-{hparams.discriminator_window}w-{hparams.noise_size}n-' \
-           f'{str(round(hparams.g_learning_rate, 6))}gLR-{str(round(hparams.d_learning_rate, 6))}dLR-'
-    name += f'{str(hparams.clipping_value) + "CV-" if hparams.clipping_value > 0 else "noCV-"}' \
-            f'{str(hparams.gradient_penalty_lambda) + "GP" if hparams.gradient_penalty_lambda != 0 else "noGP"}'
+    if not hparams.use_noise:
+        hparams.noise_size = 0
+
+    if hparams.d_freq == 0:
+        hparams.disc_warmp_up = 0
+
+    name = f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
+           f"{'encL-' if hparams.encoder_emotions else ''}" \
+           f"{hparams.noise_size}n-" \
+           f"{'intended' if hparams.use_intended_labels and hparams.use_labels else ''}" \
+           f"{'labels' if hparams.use_labels else 'NOlabels'}" \
+
+    print('\033[94m', f'Run {name} started', '\033[0m')
+    if args.waveglow_path:
+        import sys
+        sys.path.append('WaveGlow/')
 
     real = 1
     fake = - real
@@ -481,11 +495,7 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    if args.resume != '':
-        wandb.init(project="GANtron", config=hparams.__dict__, resume=args.resume)
-    else:
-        wandb.init(project="GANtron", config=hparams.__dict__, name=name, notes=args.notes)
-    wandb.save("*.pt")
+    wandb.init(project="Compare", config=hparams.__dict__, name=name, notes=args.notes)
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 

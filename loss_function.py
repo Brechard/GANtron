@@ -39,14 +39,14 @@ def get_sig():
         return torch.cuda.FloatTensor([3])
 
 
-def gaussian(x, center, sig):
-    return torch.exp(-torch.pow(x - center, 2.) / (0.5 * torch.pow(sig, 1)))
+def gaussian(x, center, sig, width):
+    return torch.exp(-torch.pow(x - center, 2.) / (width * torch.pow(sig, 1)))
 
 
-def attention_mask(n_chars, n_frames):
+def attention_mask(n_chars, n_frames, width=0.5):
     mask = torch.zeros((n_chars, n_frames), device='cuda')
     for n in range(n_chars):
         mask[n] = gaussian(torch.linspace(0, n_frames - 1, n_frames, device='cuda'),
                            n * (n_frames - 1) // (n_chars - 1),
-                           get_sig())
+                           get_sig(), width)
     return mask

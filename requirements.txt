@@ -1,10 +1,16 @@
 # install first pytorch with conda
-matplotlib
-numpy
-inflect
-librosa
-Unidecode
+matplotlib~=3.2.2
+numpy~=1.18.5
+inflect~=4.1.0
+librosa~=0.7.2
+Unidecode~=1.1.1
 pillow
 numba==0.48
-wandb
-tqdm
+wandb~=0.9.6
+tqdm~=4.46.1
+scipy~=1.5.0
+pandas~=1.0.5
+seaborn~=0.10.1
+soundfile~=0.10.3.post1
+scikit-learn~=0.23.1
+pytorch-lightning~=0.9.0

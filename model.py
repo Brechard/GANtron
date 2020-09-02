@@ -1,10 +1,10 @@
+import random
 from math import sqrt
 
 import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
-import random
 
 from layers import ConvNorm, LinearNorm, DiscConv1d, DiscDense
 from utils import to_gpu, get_mask_from_lengths
@@ -220,30 +220,35 @@ class Decoder(nn.Module):
         self.p_decoder_dropout = hparams.p_decoder_dropout
         self.noise_size = hparams.noise_size
         self.fp16 = hparams.fp16_run
+        decoder_in_dim = hparams.encoder_embedding_dim + hparams.noise_size
+        if hparams.vesus_path:
+            decoder_in_dim += hparams.speakers_embedding
+            if hparams.use_labels:
+                decoder_in_dim += 5
 
         self.prenet = Prenet(
             hparams.n_mel_channels * hparams.n_frames_per_step,
             [hparams.prenet_dim, hparams.prenet_dim])
 
         self.attention_rnn = nn.LSTMCell(
-            hparams.prenet_dim + hparams.encoder_embedding_dim + hparams.noise_size,
+            hparams.prenet_dim + decoder_in_dim,
             hparams.attention_rnn_dim)
 
         self.attention_layer = Attention(
-            hparams.attention_rnn_dim, hparams.encoder_embedding_dim + hparams.noise_size,
+            hparams.attention_rnn_dim, decoder_in_dim,
             hparams.attention_dim, hparams.attention_location_n_filters,
             hparams.attention_location_kernel_size)
 
         self.decoder_rnn = nn.LSTMCell(
-            hparams.attention_rnn_dim + hparams.encoder_embedding_dim + hparams.noise_size,
+            hparams.attention_rnn_dim + decoder_in_dim,
             hparams.decoder_rnn_dim, 1)
 
         self.linear_projection = LinearNorm(
-            hparams.decoder_rnn_dim + hparams.encoder_embedding_dim + hparams.noise_size,
+            hparams.decoder_rnn_dim + decoder_in_dim,
             hparams.n_mel_channels * hparams.n_frames_per_step)
 
         self.gate_layer = LinearNorm(
-            hparams.decoder_rnn_dim + hparams.encoder_embedding_dim + hparams.noise_size, 1,
+            hparams.decoder_rnn_dim + decoder_in_dim, 1,
             bias=True, w_init_gain='sigmoid')
 
     def get_go_frame(self, memory):
@@ -398,10 +403,11 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        noise = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
-        if self.fp16:
-            noise = noise.half()
-        memory = torch.cat([memory, noise], dim=-1)
+        if self.noise_size > 0:
+            noise = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
+            if self.fp16:
+                noise = noise.half()
+            memory = torch.cat([memory, noise], dim=-1)
 
         decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
@@ -560,31 +566,49 @@ class LinearDiscriminator(nn.Module):
 class Tacotron2(nn.Module):
     def __init__(self, hparams):
         super(Tacotron2, self).__init__()
+        if not hparams.use_noise:
+            hparams.noise_size = 0
+
         self.mask_padding = hparams.mask_padding
         self.fp16_run = hparams.fp16_run
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step = hparams.n_frames_per_step
+
+        symbols_embedding_dim = hparams.symbols_embedding_dim
+        self.encoder_emotions = False
+        if hparams.encoder_emotions:
+            self.encoder_emotions = True
+            symbols_embedding_dim -= 5
+
         self.embedding = nn.Embedding(
-            hparams.n_symbols, hparams.symbols_embedding_dim)
-        std = sqrt(2.0 / (hparams.n_symbols + hparams.symbols_embedding_dim))
+            hparams.n_symbols, symbols_embedding_dim)
+        std = sqrt(2.0 / (hparams.n_symbols + symbols_embedding_dim))
         val = sqrt(3.0) * std  # uniform bounds for std
         self.embedding.weight.data.uniform_(-val, val)
+        self.vesus = False
+        self.use_labels = hparams.use_labels
+        if hparams.vesus_path:
+            self.vesus = True
+            self.speaker_embedding = nn.Embedding(123, hparams.speakers_embedding)
+            self.speaker_embedding.weight.data.uniform_(-val, val)
+
         self.encoder = Encoder(hparams)
         self.decoder = Decoder(hparams)
         self.postnet = Postnet(hparams)
 
     def parse_batch(self, batch):
-        text_padded, input_lengths, mel_padded, gate_padded, \
-        output_lengths = batch
+        text_padded, input_lengths, mel_padded, gate_padded, speaker_ids, emotions, output_lengths = batch
         text_padded = to_gpu(text_padded).long()
         input_lengths = to_gpu(input_lengths).long()
+        speaker_ids = to_gpu(speaker_ids).long()
         max_len = torch.max(input_lengths.data).item()
         mel_padded = to_gpu(mel_padded).float()
         gate_padded = to_gpu(gate_padded).float()
+        emotions = to_gpu(emotions).float()
         output_lengths = to_gpu(output_lengths).long()
 
         return (
-            (text_padded, input_lengths, mel_padded, max_len, output_lengths),
+            (text_padded, input_lengths, mel_padded, max_len, speaker_ids, emotions, output_lengths),
             (mel_padded, gate_padded))
 
     def parse_output(self, outputs, output_lengths=None):
@@ -600,12 +624,25 @@ class Tacotron2(nn.Module):
         return outputs
 
     def forward(self, inputs):
-        text_inputs, text_lengths, mels, max_len, output_lengths = inputs
+        text_inputs, text_lengths, mels, max_len, speaker_ids, emotions, output_lengths = inputs
         text_lengths, output_lengths = text_lengths.data, output_lengths.data
 
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
+        if self.encoder_emotions:
+            emotions_enc = emotions[:, :, None].repeat(1, 1, embedded_inputs.size(-1))
+            embedded_inputs = torch.cat((embedded_inputs, emotions_enc), dim=1)
 
         encoder_outputs = self.encoder(embedded_inputs, text_lengths)
+
+        if self.vesus:
+            embedded_speaker = self.speaker_embedding(speaker_ids)[:, None]
+            # Repeat the speaker and emotion for each part of the embedded text for the attention mechanism
+            embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
+            if self.use_labels and not self.encoder_emotions:
+                embedded_emotions = emotions[:, None].repeat(1, encoder_outputs.size(1), 1)
+                encoder_outputs = torch.cat((encoder_outputs, embedded_speaker, embedded_emotions), dim=2)
+            else:
+                encoder_outputs = torch.cat((encoder_outputs, embedded_speaker), dim=2)
 
         mel_outputs, gate_outputs, alignments = self.decoder(
             encoder_outputs, mels, memory_lengths=text_lengths)
@@ -617,9 +654,20 @@ class Tacotron2(nn.Module):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
             output_lengths)
 
-    def inference(self, text_inputs, style=None):
+    def inference(self, text_inputs, style=None, emotions=None, encoder_emotions=False, speaker=None):
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
         encoder_outputs = self.encoder.inference(embedded_inputs)
+
+        if speaker is not None:
+            embedded_speaker = self.speaker_embedding(speaker)[:, None]
+            # Repeat the speaker and emotion for each part of the embedded text for the attention mechanism
+            embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
+            encoder_outputs = torch.cat((encoder_outputs, embedded_speaker), dim=2)
+
+        if emotions is not None and not encoder_emotions:
+            emotions = emotions[:, None].repeat(1, encoder_outputs.size(1), 1)
+            encoder_outputs = torch.cat((encoder_outputs, emotions), dim=2)
+
         mel_outputs, gate_outputs, alignments = self.decoder.inference(
             encoder_outputs, style)
 

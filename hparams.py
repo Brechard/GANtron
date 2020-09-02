@@ -10,7 +10,7 @@ class HParams:
         ################################
         # Experiment Parameters        #
         ################################
-        self.epochs = 500
+        self.epochs = 200
         self.iters_per_checkpoint = 5000
         self.seed = 1234
         self.dynamic_loss_scaling = True
@@ -26,13 +26,18 @@ class HParams:
                               'decoder.gate_layer.linear_layer.weight']
         self.attn_steps = 5000
         self.reduce_lr_steps_every = 5e4
+        self.vesus_path = None
+        self.speakers_embedding = 64
+        self.use_labels = True
+        self.use_noise = False
+        self.use_intended_labels = True
 
         ################################
         # Data Parameters             #
         ################################
         self.load_mel_from_disk = False
-        self.training_files = 'filelists/ljs_audio_text_train_filelist.txt'
-        self.validation_files = 'filelists/ljs_audio_text_val_filelist.txt'
+        self.training_files = ['filelists/ljs_audio_text_train_filelist.txt', 'filelists/vesus_train.txt']
+        self.validation_files = ['filelists/ljs_audio_text_val_filelist.txt', 'filelists/vesus_val.txt']
         self.text_cleaners = ['english_cleaners']
 
         ################################
@@ -90,7 +95,7 @@ class HParams:
         self.noise_size = 20
         self.disc_warmp_up = 500
         self.discriminator_type = 'linear'
-
+        self.encoder_emotions = False
 
         ################################
         # Optimization Hyperparameters #
@@ -106,7 +111,10 @@ class HParams:
         if hparams_string:
             for param in hparams_string.split(','):
                 key, value = param.split('=')
-                self.add_param(key, ast.literal_eval(value))
+                if '/' in value:
+                    self.add_param(key, value)
+                else:
+                    self.add_param(key, ast.literal_eval(value))
 
     def add_param(self, param, value):
         self.__setattr__(param, value)
