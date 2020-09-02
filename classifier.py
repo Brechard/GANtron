@@ -239,12 +239,13 @@ if __name__ == '__main__':
     parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
     parser.add_argument('--model_size', type=int, default=512, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
-    parser.add_argument('--hparams', type=str, default='', help='Comma separated name=value pairs')
+    parser.add_argument('--hparams', type=str, default=None, help='Comma separated name=value pairs')
 
     args = parser.parse_args()
     hp = HParams()
     hp.add_params(args)
-    hp.add_params(args.hparams)
+    if args.hparams is not None:
+        hp.add_params(args.hparams)
 
     name = f'3DS-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \

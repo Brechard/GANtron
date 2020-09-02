@@ -62,7 +62,7 @@ class HParams:
         self.__setattr__(param, value)
 
     def add_params(self, params):
-        if type(params) is str:
+        if type(params) is str and '=':
             self.add_params_string(params)
             return
 
