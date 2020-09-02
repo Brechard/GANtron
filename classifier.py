@@ -48,7 +48,14 @@ class Classifier(pl.LightningModule, ABC):
         if hparams['use_labels'] == 'one' or hparams['use_labels'] == 'multi':
             self.criterion = torch.nn.BCEWithLogitsLoss()
 
-        self.val_log = "Validation loss - " + ("Intended" if hparams['use_labels'] else "Calculated")
+        self.val_log = "Validation loss - "
+        if hparams['use_labels'] == 'intended':
+            self.val_log += "Intended"
+        elif hparams['use_labels'] == 'multi':
+            self.val_log += "Multi"
+        else:
+            self.val_log += "One"
+
         if hparams['linear_model']:
             self.model = torch.nn.Sequential(
                 module(hparams['n_mel_channels'] * hparams['n_frames'], hparams['model_size']),
