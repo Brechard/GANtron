@@ -151,7 +151,10 @@ def load_cremad_ravdess(filename, wavs_path, use_labels, crema: bool):
                 labels[chosen] = 1
                 emotions.append(labels)
             elif use_labels == 'intended':
-                emo_id = l[0].split('-')[2]
+                if crema:
+                    emo_id = l[0][9:12]
+                else:
+                    emo_id = l[0].split('-')[2]
                 if emo_id not in from_ids:
                     continue
                 emotions.append(from_ids[emo_id])
