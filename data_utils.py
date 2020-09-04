@@ -132,16 +132,17 @@ class TextMelCollate:
 
 
 class MelLoader(torch.utils.data.Dataset):
-    def __init__(self, mel_paths, emotions, mel_offset):
+    def __init__(self, mel_paths, emotions, mel_offset, max_noise):
         self.mel_paths = mel_paths
         self.emotions = emotions
         assert len(mel_paths) == len(emotions)
         self.mel_offset = mel_offset
         self.indexes = list(range(len(mel_paths)))
+        self.max_noise = max_noise
         shuffle(self.indexes)
 
     def add_noise(self, mel):
-        mel = mel + np.random.random(mel.shape)
+        mel = mel + np.random.random(mel.shape) * self.max_noise
         mel[mel > 0] = 0
         mel[mel < -80] = -80
         return mel

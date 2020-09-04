@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import warnings
 from abc import ABC
 
 import librosa
@@ -31,13 +32,15 @@ def conv_module(size_in, size_out, kernel_size=3, dilation=1, padding=None, avg_
         assert (kernel_size % 2 == 1)
         padding = int(dilation * (kernel_size - 1) / 2)
 
-    return torch.nn.Sequential(
+    module = torch.nn.Sequential(
         torch.nn.Conv2d(size_in, size_out, kernel_size=kernel_size, padding=padding, dilation=dilation),
         torch.nn.BatchNorm2d(size_out),
         torch.nn.Dropout(0.5),
-        torch.nn.LeakyReLU(0.1),
-        torch.nn.AvgPool2d((avg_pool, avg_pool))
+        torch.nn.LeakyReLU(0.1)
     )
+    if avg_pool > 0:
+        module.add_module('MaxPool', torch.nn.AvgPool2d((avg_pool, avg_pool)))
+    return module
 
 
 class Classifier(pl.LightningModule, ABC):
@@ -57,8 +60,9 @@ class Classifier(pl.LightningModule, ABC):
             self.val_log += "One"
 
         if hparams['linear_model']:
+            self.flatten_size = hparams['n_mel_channels'] * hparams['n_frames']
             self.model = torch.nn.Sequential(
-                module(hparams['n_mel_channels'] * hparams['n_frames'], hparams['model_size']),
+                module(self.flatten_size, hparams['model_size']),
                 module(hparams['model_size'], hparams['model_size']),
                 module(hparams['model_size'], hparams['model_size']),
                 torch.nn.Linear(hparams['model_size'], hparams['n_emotions'])
@@ -69,7 +73,8 @@ class Classifier(pl.LightningModule, ABC):
             self.model = torch.nn.Sequential(
                 conv_module(1, hparams['model_size']),
                 conv_module(hparams['model_size'], hparams['model_size']),
-                conv_module(hparams['model_size'], hparams['n_emotions']),
+                conv_module(hparams['model_size'], hparams['model_size']),
+                conv_module(hparams['model_size'], hparams['n_emotions'], avg_pool=0),
                 torch.nn.Flatten(),
                 # Divide by 2^3 because of max pool
                 torch.nn.Linear(flatten_size, hparams['n_emotions']),
@@ -98,7 +103,24 @@ class Classifier(pl.LightningModule, ABC):
         """ Shape (Batch, n_mels, n_frames)"""
         if self.hparams['linear_model']:
             x = x.reshape(x.size(0), -1)
+            if x.size(1) != self.flatten_size:
+                warnings.warn('Input size does not fit the model, we will return the average of a sliding window')
+                final_output = np.zeros(self.hparams['n_emotions'])
+                for i in range(int(x.size(1) / self.flatten_size)):
+                    final_output += torch.nn.Softmax()(
+                        self.model(x[:, i * self.flatten_size: (i + 1) * self.flatten_size]))
+                return final_output / int(x.size(1) / self.flatten_size)
         else:
+            if x.size(-1) % self.hparams['n_frames'] != 0:
+                # The input cannot be divided exactly so there will be some overlapping between the last two windows.
+                warnings.warn(
+                    'Input size does not fit the model, we will return the result of a sliding window as a list')
+                n_frames_exact = int(x.size(-1) / self.hparams['n_frames']) * self.hparams['n_frames']
+                new_x = x[:, :, :n_frames_exact].reshape(-1, self.hparams['n_mel_channels'],
+                                                         self.hparams['n_frames'])
+                new_x = torch.cat([new_x, x[:, :, -self.hparams['n_frames']:]])
+                return torch.nn.Softmax()(self.model(new_x.unsqueeze(1)))
+
             x = x.unsqueeze(1)
         return torch.nn.Softmax()(self.model(x))
 
@@ -186,7 +208,7 @@ def load_mel(path, hparams):
 
 def load_files(files, audio_path, use_labels):
     filepaths, _, emotions = load_vesus(files[0], audio_path + '/VESUS/Audio/',
-                                                    use_labels=use_labels, use_text=False)
+                                        use_labels=use_labels, use_text=False)
     cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
                                                  use_labels=use_labels, crema=True)
     filepaths.extend(cremad_file)
@@ -199,20 +221,21 @@ def load_files(files, audio_path, use_labels):
 
 
 def prepare_data(audio_path, hparams):
-    use_labels, mel_offset, bs = hparams.use_labels, hparams.mel_offset, hparams.batch_size
+    max_noise, mel_offset, bs = hparams.max_noise, hparams.mel_offset, hparams.batch_size
     train_filepaths, train_emotions = load_files(hparams.training_files, audio_path, hparams.use_labels)
     val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels)
     test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels)
     train_filepaths, val_filepaths, test_filepaths = load_npy_mels([train_filepaths, val_filepaths, test_filepaths],
                                                                    hparams)
 
-    train_loader = DataLoader(MelLoader(train_filepaths, train_emotions, mel_offset), num_workers=0, shuffle=True,
-                              batch_size=bs, pin_memory=False, drop_last=True, collate_fn=MelLoaderCollate())
+    train_loader = DataLoader(MelLoader(train_filepaths, train_emotions, mel_offset, max_noise), num_workers=0,
+                              shuffle=True, batch_size=bs, pin_memory=False, drop_last=True,
+                              collate_fn=MelLoaderCollate())
 
-    val_loader = DataLoader(MelLoader(val_filepaths, val_emotions, mel_offset), num_workers=0,
+    val_loader = DataLoader(MelLoader(val_filepaths, val_emotions, mel_offset, max_noise), num_workers=0,
                             shuffle=False, batch_size=bs, pin_memory=False, collate_fn=MelLoaderCollate())
 
-    test_loader = MelLoader(test_filepaths, test_emotions, mel_offset)
+    test_loader = MelLoader(test_filepaths, test_emotions, mel_offset, max_noise)
 
     return train_loader, val_loader, test_loader
 
@@ -237,7 +260,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_labels', type=str, default='one', help="can be either \'one\' (maximum of the voted), "
                                                                       "\'intended\' (what actor was supposed to do) or"
                                                                       "\'multi\' (result of calculated emotions)")
-    parser.add_argument('--linear_model', type=str2bool, default=False, help='Use linear model or convolutional')
+    parser.add_argument('--linear_model', type=str2bool, default=True, help='Use linear model or convolutional')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Batch size, recommended to use a small one even if it is smaller.')
@@ -246,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
     parser.add_argument('--model_size', type=int, default=512, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
+    parser.add_argument('--max_noise', type=int, default=3, help='Maximum noise to add to the dataset')
     parser.add_argument('--hparams', type=str, default=None, help='Comma separated name=value pairs')
 
     args = parser.parse_args()
@@ -254,7 +278,7 @@ if __name__ == '__main__':
     if args.hparams is not None:
         hp.add_params(args.hparams)
 
-    name = f'3DS-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
+    name = f'v{hp.model_version}-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
            f'-{hp.use_labels}'
     # wandb.init(project="Classifier", config=args, name=name)

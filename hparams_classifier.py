@@ -15,6 +15,7 @@ class HParams:
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
         self.use_labels = 'one'
+        self.model_version = '0.3'
 
         ################################
         # Data Parameters             #
@@ -46,6 +47,7 @@ class HParams:
         self.lr = 0.001
         self.weight_decay = 1e-6
         self.batch_size = 32
+        self.max_noise = 3
 
         if hparams_string:
             self.add_params_string(hparams_string)
