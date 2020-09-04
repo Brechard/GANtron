@@ -209,10 +209,10 @@ def load_mel(path, hparams):
 def load_files(files, audio_path, use_labels):
     filepaths, _, emotions = load_vesus(files[0], audio_path + '/VESUS/Audio/',
                                         use_labels=use_labels, use_text=False)
-    cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
-                                                 use_labels=use_labels, crema=True)
-    filepaths.extend(cremad_file)
-    emotions.extend(cremad_em)
+    # cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
+    #                                              use_labels=use_labels, crema=True)
+    # filepaths.extend(cremad_file)
+    # emotions.extend(cremad_em)
     ravdess_file, ravdess_em = load_cremad_ravdess(files[2], audio_path + '/RAVDESS/Speech/',
                                                    use_labels=use_labels, crema=False)
     filepaths.extend(ravdess_file)

@@ -128,7 +128,7 @@ def load_cremad_ravdess(filename, wavs_path, use_labels, crema: bool):
             "NEU": [1, 0, 0, 0, 0],
             "ANG": [0, 1, 0, 0, 0],
             "HAP": [0, 0, 1, 0, 0],
-            "Sad": [0, 0, 0, 1, 0],
+            "SAD": [0, 0, 0, 1, 0],
             "FEA": [0, 0, 0, 0, 1]
         }
     else:

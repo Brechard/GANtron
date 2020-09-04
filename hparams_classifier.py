@@ -15,7 +15,7 @@ class HParams:
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
         self.use_labels = 'one'
-        self.model_version = '0.3'
+        self.model_version = '0.4'
 
         ################################
         # Data Parameters             #
