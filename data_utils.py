@@ -157,7 +157,7 @@ class MelLoader(torch.utils.data.Dataset):
         path = self.mel_paths[self.indexes[index]]
         mel = self.get_mel(self.mel_paths[self.indexes[index]])
         em = torch.FloatTensor(self.emotions[self.indexes[index]])
-        return mel, em
+        return mel, em, path
 
     def __len__(self):
         return len(self.mel_paths)
@@ -175,10 +175,11 @@ class MelLoaderCollate:
         mel_padded.zero_()
         emotions = torch.FloatTensor(len(batch), len(batch[0][1]))
         emotions.zero_()
-
+        paths = []
         for i in range(len(ids_sorted_decreasing)):
             mel = batch[ids_sorted_decreasing[i]][0]
             mel_padded[i, :, :mel.size(1)] = mel
             emotions[i] = batch[ids_sorted_decreasing[i]][1]
+            paths.append(batch[ids_sorted_decreasing[i]][2])
 
-        return mel_padded.cuda(non_blocking=True), input_lengths[-1], emotions.cuda(non_blocking=True)
+        return mel_padded.cuda(non_blocking=True), input_lengths, emotions.cuda(non_blocking=True), paths

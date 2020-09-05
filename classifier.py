@@ -43,12 +43,22 @@ def conv_module(size_in, size_out, kernel_size=3, dilation=1, padding=None, avg_
     return module
 
 
+def get_random_start(offset, length):
+    if length - offset > 0:
+        start = torch.randint(offset, length, (1,))
+    elif length >= 0:
+        start = torch.randint(0, length, (1,))
+    else:
+        start = 0
+    return start
+
+
 class Classifier(pl.LightningModule, ABC):
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
         self.criterion = torch.nn.MSELoss()
-        if hparams['use_labels'] == 'one' or hparams['use_labels'] == 'multi':
+        if hparams['use_labels'] == 'one' or hparams['use_labels'] == 'intended':
             self.criterion = torch.nn.BCEWithLogitsLoss()
 
         self.val_log = "Validation loss - "
@@ -80,15 +90,13 @@ class Classifier(pl.LightningModule, ABC):
                 torch.nn.Linear(flatten_size, hparams['n_emotions']),
             )
 
-    def forward(self, x, smallest_length):
-        if smallest_length - self.hparams['n_frames'] - 25 > 0:
-            start = np.random.randint(25, smallest_length.cpu().numpy() - self.hparams['n_frames'])
-        elif smallest_length - self.hparams['n_frames'] >= 0:
-            start = smallest_length - self.hparams['n_frames']
-        else:
-            start = 0
+    def forward(self, x, lengths):
+        new_x = torch.zeros_like(x[:, :, :self.hparams['n_frames']])
+        for pos, lenght in enumerate(lengths):
+            start = get_random_start(self.hparams['mel_offset'], lenght - self.hparams['n_frames'])
+            new_x[pos] = x[pos, :, start:start + self.hparams['n_frames']]
 
-        x = x[:, :, start:start + self.hparams['n_frames']]
+        x = new_x
         if self.hparams['linear_model']:
             x = x.reshape(x.size(0), -1)
         else:
@@ -105,11 +113,11 @@ class Classifier(pl.LightningModule, ABC):
             x = x.reshape(x.size(0), -1)
             if x.size(1) != self.flatten_size:
                 warnings.warn('Input size does not fit the model, we will return the average of a sliding window')
-                final_output = np.zeros(self.hparams['n_emotions'])
-                for i in range(int(x.size(1) / self.flatten_size)):
-                    final_output += torch.nn.Softmax()(
-                        self.model(x[:, i * self.flatten_size: (i + 1) * self.flatten_size]))
-                return final_output / int(x.size(1) / self.flatten_size)
+                n_frames_exact = int(x.size(1) / self.flatten_size) * self.flatten_size
+                new_x = x[:, :n_frames_exact].reshape(-1, self.flatten_size)
+                if n_frames_exact != x.size(1):
+                    new_x = torch.cat([new_x, x[:, -self.flatten_size:]])
+                x = new_x
         else:
             if x.size(-1) % self.hparams['n_frames'] != 0:
                 # The input cannot be divided exactly so there will be some overlapping between the last two windows.
@@ -121,7 +129,7 @@ class Classifier(pl.LightningModule, ABC):
                 new_x = torch.cat([new_x, x[:, :, -self.hparams['n_frames']:]])
                 return torch.nn.Softmax()(self.model(new_x.unsqueeze(1)))
 
-            x = x.unsqueeze(1)
+            x = x.reshape(-1, 1, self.hparams['n_mel_channels'], self.hparams['n_frames'])
         return torch.nn.Softmax()(self.model(x))
 
     def configure_optimizers(self):
@@ -132,8 +140,8 @@ class Classifier(pl.LightningModule, ABC):
 
     def training_step(self, batch, batch_idx):
         start = time.perf_counter()
-        x, smallest_length, y = batch
-        y_hat = self(x, smallest_length).squeeze(-1)
+        x, lenghts, y, paths = batch
+        y_hat = self(x, lenghts).squeeze(-1)
         loss = self.criterion(y_hat, y)
         output = {
             'loss': loss,
@@ -142,8 +150,8 @@ class Classifier(pl.LightningModule, ABC):
         return output
 
     def validation_step(self, batch, batch_idx):
-        x, smallest_length, y = batch
-        y_hat = self(x, smallest_length).squeeze(-1)
+        x, lenghts, y, paths = batch
+        y_hat = self(x, lenghts).squeeze(-1)
         acc = 0
         for i in range(len(y)):
             acc += int(torch.argmax(y[i]) == torch.argmax(y_hat[i]))
@@ -167,8 +175,8 @@ class Classifier(pl.LightningModule, ABC):
         return {'avg_val_loss': avg_loss, 'log': logs}
 
     def test_step(self, batch, batch_idx):
-        x, smallest_length, y = batch
-        y_hat = self(x, smallest_length).squeeze(-1)
+        x, lenghts, y, paths = batch
+        y_hat = self(x, lenghts).squeeze(-1)
         loss = self.criterion(y_hat, y)
         output = {
             'test_loss': loss,
@@ -209,10 +217,10 @@ def load_mel(path, hparams):
 def load_files(files, audio_path, use_labels):
     filepaths, _, emotions = load_vesus(files[0], audio_path + '/VESUS/Audio/',
                                         use_labels=use_labels, use_text=False)
-    # cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
-    #                                              use_labels=use_labels, crema=True)
-    # filepaths.extend(cremad_file)
-    # emotions.extend(cremad_em)
+    cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
+                                                 use_labels=use_labels, crema=True)
+    filepaths.extend(cremad_file)
+    emotions.extend(cremad_em)
     ravdess_file, ravdess_em = load_cremad_ravdess(files[2], audio_path + '/RAVDESS/Speech/',
                                                    use_labels=use_labels, crema=False)
     filepaths.extend(ravdess_file)
@@ -245,7 +253,7 @@ def train(audio_path, hparams):
 
     model = Classifier(hparams.__dict__)
 
-    wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True)
+    wandb_logger = WandbLogger(project='Classifier', name=name, log_model=True, tags=hparams.model_version)
     wandb_logger.log_hyperparams(args)
     checkpoint_callback = ModelCheckpoint(filepath=wandb_logger.save_dir + '/{epoch}-{val_loss:.2f}-{acc:.4f}')
 
@@ -265,7 +273,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--n_frames', type=int, default=40, help='Number of frames to use for classification')
+    parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
     parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
     parser.add_argument('--model_size', type=int, default=512, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
