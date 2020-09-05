@@ -46,7 +46,7 @@ def conv_module(size_in, size_out, kernel_size=3, dilation=1, padding=None, avg_
 def get_random_start(offset, length):
     if length - offset > 0:
         start = torch.randint(offset, length, (1,))
-    elif length >= 0:
+    elif length > 0:
         start = torch.randint(0, length, (1,))
     else:
         start = 0
