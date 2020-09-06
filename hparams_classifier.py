@@ -1,8 +1,8 @@
 import argparse
 import ast
 
-from text import symbols
 
+# TODO: make abstract HParams class and make this as child of it
 
 class HParams:
     def __init__(self, hparams_string=None):
@@ -10,11 +10,11 @@ class HParams:
         ################################
         # Experiment Parameters        #
         ################################
-        self.epochs = 300
+        self.epochs = 100
         self.precision = 16
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
-        self.use_labels = 'one'
+        self.use_labels = 'intended'
         self.model_version = '0.5'
 
         ################################
@@ -32,22 +32,22 @@ class HParams:
         self.n_ftt = 1024
         self.hop_length = 256
         self.n_mel_channels = 80
-        self.mel_offset = 20
+        self.mel_offset = 0
 
         ################################
         # Model Parameters             #
         ################################
         self.linear_model = True
-        self.model_size = 512
-        self.n_frames = 40
+        self.model_size = 256
+        self.n_frames = 80
 
         ################################
         # Optimization Hyperparameters #
         ################################
         self.lr = 0.001
         self.weight_decay = 1e-6
-        self.batch_size = 32
-        self.max_noise = 3
+        self.batch_size = 8
+        self.max_noise = 5
 
         if hparams_string:
             self.add_params_string(hparams_string)
@@ -64,15 +64,19 @@ class HParams:
         self.__setattr__(param, value)
 
     def add_params(self, params):
-        if type(params) is str and '=':
+        if type(params) is str and '=' in params:
             self.add_params_string(params)
             return
 
         if type(params) is argparse.Namespace:
             params = params.__dict__
-
+        hparams_string = None
         for param, value in params.items():
             if param == 'hparams':
-                continue
-            if value is not None:
+                hparams_string = value
+            elif value is not None:
                 self.add_param(param, value)
+
+        if hparams_string is not None:
+            # HParams passed in the hparams argument has the highest priority.
+            self.add_params_string(hparams_string)

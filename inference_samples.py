@@ -40,7 +40,7 @@ def generate_audio(waveglow, mel_spectrogram):
 
 
 def force_style_emotions(gantron, input_sequence, output_path, speaker, force_emotions, force_style, style_shape=None,
-                         n_styles=6, n_samples_styles=20):
+                         n_groups=6, n_samples_styles=20, simple_name=False):
     """
     Inference a given number of samples where the style or the emotion is forced.
 
@@ -52,9 +52,10 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
         force_emotions: Flag to force the emotions.
         force_style: Flag to force the style.
         style_shape: Folder path to save the inferred samples.
-        n_styles: Number of styles/emotions to force.
+        n_groups: Number of styles/emotions to force.
         n_samples_styles: Number of samples to inference per style.
-
+        simple_name: If name is simple it will be: groupId-nFile.wav, otherwise it will indicate if it was forced style
+        and/or forced emotion.
     Returns:
         None
     """
@@ -67,16 +68,18 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                        torch.FloatTensor([[0, 0, 0.5, 0, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0.8, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
-                   ] + [torch.rand(1, 5).cuda() for i in range(n_styles - 3)]
+                   ] + [torch.rand(1, 5).cuda() for i in range(n_groups - 3)]
     if force_style:
         styles = [
                      torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
                      torch.ones(1, style_shape[0], style_shape[1]).cuda() * 0.5,
                      torch.ones(1, style_shape[0], style_shape[1]).cuda(),
                  ] + [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
-                      range(n_styles - 3)]
-    for st in tqdm(range(n_styles)):
-        for i in range(n_samples_styles):
+                      range(n_groups - 3)]
+    for st in range(n_groups):
+        progress_bar = tqdm(range(n_samples_styles))
+        progress_bar.set_description(f'Genearting group {st + 1} of {n_groups}')
+        for i in progress_bar:
             style, emotion = None, None
             if styles is not None:
                 style = styles[st]
@@ -84,13 +87,16 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                 emotion = emotions[st]
             mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(input_sequence, style,
                                                                                 emotions=emotion, speaker=speaker)
-
-            name = ''
-            if force_emotions:
-                name += f'emotion-{st}-'
-            if force_style:
-                name += f'style-{st}-'
-            np.save(f'{output_path}/{name}{i}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+            if simple_name:
+                name = f'{st}-{i}'
+            else:
+                name = ''
+                if force_emotions:
+                    name += f'emotion-{st}-'
+                if force_style:
+                    name += f'style-{st}-'
+                name += f'{i}'
+            np.save(f'{output_path}/{name}.npy', mel_outputs_postnet[0].data.cpu().numpy())
 
 
 def random_style():

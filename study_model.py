@@ -11,14 +11,65 @@ import argparse
 import os
 
 import numpy as np
+import pytorch_lightning as pl
 import soundfile as sf
 import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
+from classifier import Classifier, load_npy_mels
+from data_utils import MelLoader, MelLoaderCollate
 from hparams import HParams
+from hparams_classifier import HParams as HPC
 from inference_samples import force_style_emotions
 from text import text_to_sequence
 from train import load_model
 from utils import str2bool
+
+
+def compute_wav(output_path, hparams):
+    waveglow = torch.load(hparams.waveglow_path)['model']
+    waveglow.cuda().eval().half()
+    for k in waveglow.convinv:
+        k.float()
+    paths = os.listdir(f"{output_path}/GANtronInference/")
+    progress_bar = tqdm(paths)
+    progress_bar.set_description(f'Genearting wav files')
+    mels = []
+    new_paths = []
+    max_len = 0
+    for p in progress_bar:
+        new_path = f"{output_path}/WaveGlowInference/{p.split('.')[0]}.wav"
+        if os.path.exists(new_path):
+            new_paths.append(new_path)
+            continue
+        mel_spectrogram = np.load(f"{output_path}/GANtronInference/{p}", allow_pickle=True)
+        mels.append(mel_spectrogram)
+        new_paths.append(p)
+        if mel_spectrogram.shape[1] > max_len:
+            max_len = mel_spectrogram.shape[1]
+
+        if len(mels) == hparams.waveglow_bs or p == paths[-1]:
+            new_mels = np.zeros((len(mels), hparams.n_mel_channels, max_len))
+            for i, mel in enumerate(mels):
+                new_mels[i, :, :mel.shape[1]] = mel
+            mels = torch.FloatTensor(new_mels).half().cuda()
+            with torch.no_grad():
+                audios = waveglow.infer(mels, sigma=0.666)
+            for i in range(len(audios)):
+                new_path = f"{output_path}/WaveGlowInference/{new_paths[i].split('.')[0]}.wav"
+                sf.write(new_path, audios[i].to(torch.float32).data.cpu().numpy(), 22050)
+                new_paths.append(new_path)
+
+            mels = []
+            new_paths = []
+    return new_paths
+
+
+def get_filepath_label_by_index_list(filepaths, labels, idx_list):
+    return list(map(filepaths.__getitem__, idx_list)), list(map(labels.__getitem__, idx_list))
 
 
 def inference_samples(output_path, hparams, text):
@@ -31,44 +82,94 @@ def inference_samples(output_path, hparams, text):
     gantron.cuda().eval()
     force_emotions = hparams.use_labels
     force_noise = hparams.use_noise
-    if hparams.force_emotions is not None:
+    if hasattr(hparams, 'force_emotions'):
         force_emotions = hparams.force_emotions
-    if hparams.force_noise is not None:
+    if hasattr(hparams, 'force_noise'):
         force_noise = hparams.force_noise
 
     force_style_emotions(gantron, input_sequence=sequence, output_path=f"{output_path}/GANtronInference/",
-                         speaker=speaker, force_emotions=force_emotions, force_style=force_noise)
+                         n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
+                         force_style=force_noise, simple_name=True)
 
 
-def compute_wav(output_path, hparams):
-    waveglow = torch.load(hparams.waveglow_path)['model']
-    waveglow.cuda().eval().half()
-    for k in waveglow.convinv:
-        k.float()
+def prepare_data(file_paths, n_groups):
+    labels = np.zeros((len(file_paths), n_groups))
+    for i, filepath in enumerate(file_paths):
+        filename = filepath.split('/')[-1].split('.')[0]
+        group, id = filename.split('-')
+        label = np.zeros(n_groups)
+        label[int(group)] = 1
+        labels[i] = label
 
-    for p in os.listdir(f"{output_path}/GANtronInference/"):
-        mel_spectrogram = np.load(f"{output_path}/GANtronInference/{p}", allow_pickle=True)
-        with torch.no_grad():
-            audio = waveglow.infer(mel_spectrogram.half(), sigma=0.666)
-            sf.write(f"{output_path}/WaveGlowInference/{p.split('.')[0]}.wav",
-                     audio[0].to(torch.float32).data.cpu().numpy(), 22050)
+    idxs = list(range(len(file_paths)))
+    np.random.shuffle(idxs)
+
+    val_lim = int(0.85 * len(file_paths))
+    test_lim = val_lim + int(0.05 * len(file_paths))
+    train_paths, train_groups = list(map(file_paths.__getitem__, idxs[:val_lim])), labels[idxs[:val_lim]]
+    val_paths, val_groups = list(map(file_paths.__getitem__, idxs[val_lim:test_lim])), labels[idxs[val_lim:test_lim]]
+    test_paths, test_groups = list(map(file_paths.__getitem__, idxs[test_lim:])), labels[idxs[test_lim:]]
+
+    return train_paths, train_groups, val_paths, val_groups, test_paths, test_groups
 
 
 def study_model(output_path, hparams, text):
     inference_samples(output_path, hparams, text)
-    compute_wav(output_path, hparams)
-    pass
+    files_paths = compute_wav(output_path, hparams)
+    files_paths = load_npy_mels([files_paths], hparams)
+    train_classifier(output_path, files_paths[0], hparams.n_groups)
+
+
+def train_classifier(output_path, files_paths, n_groups):
+    hparams_classifier = HPC()
+    hparams_classifier.n_emotions = n_groups
+    classifier = Classifier(hparams_classifier)
+    train_filepaths, train_groups, val_filepaths, val_groups, test_filepaths, test_groups = prepare_data(files_paths,
+                                                                                                         n_groups)
+    train_loader = DataLoader(
+        MelLoader(train_filepaths, train_groups, hparams_classifier.mel_offset, hparams_classifier.max_noise),
+        num_workers=0, shuffle=True, batch_size=hparams_classifier.batch_size, pin_memory=False, drop_last=True,
+        collate_fn=MelLoaderCollate())
+
+    val_loader = DataLoader(
+        MelLoader(val_filepaths, val_groups, hparams_classifier.mel_offset, hparams_classifier.max_noise),
+        num_workers=0, shuffle=False, batch_size=hparams_classifier.batch_size, pin_memory=False,
+        collate_fn=MelLoaderCollate())
+
+    test_loader = DataLoader(
+        MelLoader(test_filepaths, test_groups, hparams_classifier.mel_offset, hparams_classifier.max_noise),
+        num_workers=0, shuffle=False, batch_size=hparams_classifier.batch_size, pin_memory=False,
+        collate_fn=MelLoaderCollate())
+
+    name = output_path.split('/')[-1]
+    if name is None or name == '':
+        name = output_path.split('/')[-2]
+
+    wandb_logger = WandbLogger(project='Study models', name=name, log_model=True)
+    wandb_logger.log_hyperparams(args)
+    checkpoint_callback = ModelCheckpoint(filepath=wandb_logger.save_dir + '/{epoch}-{val_loss:.2f}-{acc:.4f}')
+
+    trainer = pl.Trainer(max_epochs=hparams_classifier.epochs, gpus=1, logger=wandb_logger,
+                         precision=hparams_classifier.precision, checkpoint_callback=checkpoint_callback)
+    trainer.fit(classifier, train_loader, val_loader)
+    result = trainer.test(test_dataloaders=test_loader)
+    tot_loss = 0
+    for res in result:
+        tot_loss += res['test_loss']
+    print(f'Test results: {tot_loss / len(result)}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', '--gantron_path', type=str, required=True, help='GANtron checkpoint path')
     parser.add_argument('-w', '--waveglow_path', type=str, required=True, help='WaveGlow checkpoint path')
-    parser.add_argument('-c', '--classifier_path', type=str, required=True, help='Classifier checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Folder to save the comparison')
-    parser.add_argument('--samples', type=int, default=20, help='Number of samples to generate')
+    parser.add_argument('--samples', type=int, default=10, help='Number of samples to generate')
+    parser.add_argument('--waveglow_bs', type=int, default=64, help='Batch size to use waveglow faster.')
     parser.add_argument('--hparams', type=str, required=False, help='comma separated name=value pairs')
     parser.add_argument('--speaker', default=0, type=int, required=False, help='Speaker to use when generating')
+    parser.add_argument('--n_groups', default=6, type=int, required=False,
+                        help='Number of different groups to generate and classify.')
     parser.add_argument('--force_emotions', default=None, type=str2bool, help='Force using/not labels when generating')
     parser.add_argument('--force_noise', default=None, type=str2bool, help='Force using/not noise when generating')
 
@@ -77,7 +178,7 @@ if __name__ == '__main__':
     for folder in ['GANtronInference', 'WaveGlowInference', 'ClassifierOutput']:
         os.makedirs(f'{args.output_path}/{folder}', exist_ok=True)
 
-    hparams = HParams()
-    hparams.add_params(args)
+    hp = HParams()
+    hp.add_params(args)
 
-    study_model(args.output_path, hparams, text="This voice was generated by a machine")
+    study_model(args.output_path, hp, text="Emotional speech synthesis")

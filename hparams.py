@@ -48,6 +48,7 @@ class HParams:
         self.filter_length = 1024
         self.hop_length = 256
         self.win_length = 1024
+        self.n_ftt = 1024
         self.n_mel_channels = 80
         self.mel_fmin = 0.0
         self.mel_fmax = 8000.0
@@ -109,22 +110,34 @@ class HParams:
         self.mask_padding = True  # set model's padded outputs to padded values
 
         if hparams_string:
-            for param in hparams_string.split(','):
-                key, value = param.split('=')
-                if '/' in value:
-                    self.add_param(key, value)
-                else:
-                    self.add_param(key, ast.literal_eval(value))
+            self.add_params_string(hparams_string)
+
+    def add_params_string(self, hparams_string):
+        for param in hparams_string.split(','):
+            key, value = param.split('=')
+            if '/' in value:
+                self.add_param(key, value)
+            else:
+                self.add_param(key, ast.literal_eval(value))
 
     def add_param(self, param, value):
         self.__setattr__(param, value)
 
     def add_params(self, params):
+        if type(params) is str and '=' in params:
+            self.add_params_string(params)
+            return
+
         if type(params) is argparse.Namespace:
             params = params.__dict__
-
+        hparams_string = None
         for param, value in params.items():
             if param == 'hparams':
-                continue
-            if value is not None:
+                hparams_string = value
+            elif value is not None:
                 self.add_param(param, value)
+
+        if hparams_string is not None:
+            # HParams passed in the hparams argument has the highest priority.
+            self.add_params_string(hparams_string)
+

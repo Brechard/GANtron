@@ -444,7 +444,6 @@ class Decoder(nn.Module):
         """
         if style is None:
             style = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
-            print(style.shape)
         if self.fp16:
             style = style.half()
         memory = torch.cat([memory, style], dim=-1)

@@ -56,6 +56,8 @@ def get_random_start(offset, length):
 class Classifier(pl.LightningModule, ABC):
     def __init__(self, hparams):
         super().__init__()
+        if type(hparams) == HParams:
+            hparams = hparams.__dict__
         self.hparams = hparams
         self.criterion = torch.nn.MSELoss()
         if hparams['use_labels'] == 'one' or hparams['use_labels'] == 'intended':
@@ -185,17 +187,25 @@ class Classifier(pl.LightningModule, ABC):
         return output
 
 
-def load_npy_mels(filepaths_list, hparams):
+def load_npy_mels(filepaths_lists, hparams):
     """
     Save all mel spectrograms as np files so they can be loaded much faster.
+
+    Args:
+        filepaths_lists: List with the filepaths to the files containing the filepaths for train, val and test
+        hparams: Hyperparameters for loading the mel spectrograms
+
+    Returns:
+        List with the new filepaths
     """
+
     new_filepaths_lists = []
-    for n, filepath in enumerate(filepaths_list):
+    for n, filepath in enumerate(filepaths_lists):
         progress_bar = tqdm(filepath)
-        progress_bar.set_description(f'Loading file {n}/{len(filepaths_list)}')
+        progress_bar.set_description(f'Loading file {n}/{len(filepaths_lists)}')
         new_filepaths_list = []
         a = 0
-        for path in tqdm(filepath):
+        for path in progress_bar:
             if not os.path.exists(path.split('.')[0] + '.npy'):
                 load_mel(path, hparams)
             new_filepaths_list.append(path.split('.')[0] + '.npy')
@@ -260,6 +270,11 @@ def train(audio_path, hparams):
     trainer = pl.Trainer(max_epochs=hparams.epochs, gpus=1, logger=wandb_logger, precision=hparams.precision,
                          checkpoint_callback=checkpoint_callback)
     trainer.fit(model, train_loader, val_loader)
+    result = trainer.test(test_dataloaders=test_loader)
+    tot_loss = 0
+    for res in result:
+        tot_loss += res['test_loss']
+    print(f'Test results: {tot_loss / len(result)}')
 
 
 if __name__ == '__main__':
@@ -289,9 +304,9 @@ if __name__ == '__main__':
     name = f'v{hp.model_version}-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
            f'-{hp.use_labels}'
-    # wandb.init(project="Classifier", config=args, name=name)
+
     args.audio_path = 'C:/Users/rodri/Datasets/'
     if not hp.linear_model and hp.n_frames % 8 != 0:
         raise argparse.ArgumentTypeError("Due to the three MaxPool layers, n_frames must be a multiple of 8")
 
-    train(args.audio_path, hp)
+    train(hp, audio_path=args.audio_path, project='Classifier', name=name)
