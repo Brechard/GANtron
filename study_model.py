@@ -190,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gantron_path', type=str, required=True, help='GANtron checkpoint path')
     parser.add_argument('-w', '--waveglow_path', type=str, required=True, help='WaveGlow checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Folder to save the comparison')
-    parser.add_argument('--', type=int, default=10, help='Number of samples to generate')
+    parser.add_argument('--samples', type=int, default=10, help='Number of samples to generate')
     parser.add_argument('--waveglow_bs', type=int, default=1,
                         help='Batch size to use waveglow faster. Be careful with it since if audios are not of the '
                              'same size it will generate noise at the end of the file')
