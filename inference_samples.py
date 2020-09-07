@@ -66,14 +66,14 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
             if n_groups > 6:
                 raise ValueError('When using emotions as integers there are no more combinations possible than 6.')
             emotions = [
-                           # [Neutral, Angry, Happy, Sad, Fearful]
-                           torch.FloatTensor([[1, 0, 0, 0, 0]]).cuda(),
-                           torch.FloatTensor([[0, 1, 0, 0, 0]]).cuda(),
-                           torch.FloatTensor([[0, 0, 1, 0, 0]]).cuda(),
-                           torch.FloatTensor([[0, 0, 0, 1, 0]]).cuda(),
-                           torch.FloatTensor([[0, 0, 0, 0, 1]]).cuda(),
-                           torch.FloatTensor([[0, 0, 0, 0, 0]]).cuda()
-                       ]
+                # [Neutral, Angry, Happy, Sad, Fearful]
+                torch.FloatTensor([[1, 0, 0, 0, 0]]).cuda(),
+                torch.FloatTensor([[0, 1, 0, 0, 0]]).cuda(),
+                torch.FloatTensor([[0, 0, 1, 0, 0]]).cuda(),
+                torch.FloatTensor([[0, 0, 0, 1, 0]]).cuda(),
+                torch.FloatTensor([[0, 0, 0, 0, 1]]).cuda(),
+                torch.FloatTensor([[0, 0, 0, 0, 0]]).cuda()
+            ]
         else:
             emotions = [
                            # [Neutral, Angry, Happy, Sad, Fearful]
@@ -84,12 +84,8 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                            torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
                        ] + [torch.rand(1, 5).cuda() for i in range(n_groups - 5)]
     if force_style:
-        styles = [
-                     torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
-                     torch.ones(1, style_shape[0], style_shape[1]).cuda() * 0.5,
-                     torch.ones(1, style_shape[0], style_shape[1]).cuda(),
-                 ] + [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
-                      range(n_groups - 3)]
+        styles = [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
+                  range(n_groups)]
     for st in range(n_groups):
         progress_bar = tqdm(range(n_samples_styles))
         progress_bar.set_description(f'Genearting group {st + 1} of {n_groups}')
