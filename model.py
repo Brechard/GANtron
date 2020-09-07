@@ -8,7 +8,8 @@ from torch.nn import functional as F
 
 from layers import ConvNorm, LinearNorm, DiscConv1d, DiscDense
 from utils import to_gpu, get_mask_from_lengths
-
+from text import text_to_sequence
+import numpy as np
 
 class LocationLayer(nn.Module):
     def __init__(self, attention_n_filters, attention_kernel_size,
@@ -654,6 +655,25 @@ class Tacotron2(nn.Module):
             output_lengths)
 
     def inference(self, text_inputs, style=None, emotions=None, encoder_emotions=False, speaker=None):
+        """
+        Inference a spectrogram given the inputs
+        Args:
+            text_inputs: Either already transformed text or raw string that will be converted
+            style: Style to use (input noise), if None and needed it will be created randomly.
+            emotions: Label of emotions to use.
+            encoder_emotions: If the emotions are used as input of the encoder or the decoder.
+            speaker: torch.LongTensor([speaker_id])
+
+        Returns:
+            mel_outputs, mel_outputs_postnet, gate_outputs, alignments
+        """
+        if type(text_inputs) == str:
+            sequence = np.array(text_to_sequence(text_inputs, ['english_cleaners']))[None, :]
+            text_inputs = torch.autograd.Variable(torch.from_numpy(sequence)).cuda().long()
+
+        if self.use_labels and emotions is None:
+            emotions = torch.rand(1, 5).cuda()
+
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
         encoder_outputs = self.encoder.inference(embedded_inputs)
 

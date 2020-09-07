@@ -68,7 +68,7 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                        torch.FloatTensor([[0, 0, 0.5, 0, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0.8, 0]]).cuda(),
                        torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
-                   ] + [torch.rand(1, 5).cuda() for i in range(n_groups - 3)]
+                   ] + [torch.rand(1, 5).cuda() for i in range(n_groups - 5)]
     if force_style:
         styles = [
                      torch.zeros(1, style_shape[0], style_shape[1]).cuda(),
@@ -85,8 +85,7 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                 style = styles[st]
             if emotions is not None:
                 emotion = emotions[st]
-            mel_outputs, mel_outputs_postnet, _, alignments = gantron.inference(input_sequence, style,
-                                                                                emotions=emotion, speaker=speaker)
+            mel_outputs_postnet = gantron.inference(input_sequence, style, emotions=emotion, speaker=speaker)[1]
             if simple_name:
                 name = f'{st}-{i}'
             else:
