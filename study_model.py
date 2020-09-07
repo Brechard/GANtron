@@ -201,6 +201,7 @@ if __name__ == '__main__':
                         help='Number of different groups to generate and classify.')
     parser.add_argument('--force_emotions', default=None, type=str2bool, help='Force using/not labels when generating')
     parser.add_argument('--force_noise', default=None, type=str2bool, help='Force using/not noise when generating')
+    parser.add_argument('--int_labels', action='store_true', help='Use integer values for the labels')
 
     args = parser.parse_args()
     os.makedirs(args.output_path, exist_ok=True)
