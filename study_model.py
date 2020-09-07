@@ -108,7 +108,8 @@ def inference_samples(output_path, hparams, text):
 
     force_style_emotions(gantron, input_sequence=sequence, output_path=f"{output_path}/GANtronInference/",
                          n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
-                         force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples)
+                         force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples,
+                         style_shape=[sequence.size(1), hparams.noise_size])
 
 
 def prepare_data(file_paths, n_groups):
@@ -189,7 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gantron_path', type=str, required=True, help='GANtron checkpoint path')
     parser.add_argument('-w', '--waveglow_path', type=str, required=True, help='WaveGlow checkpoint path')
     parser.add_argument('-o', '--output_path', type=str, required=True, help='Folder to save the comparison')
-    parser.add_argument('--samples', type=int, default=10, help='Number of samples to generate')
+    parser.add_argument('--', type=int, default=10, help='Number of samples to generate')
     parser.add_argument('--waveglow_bs', type=int, default=1,
                         help='Batch size to use waveglow faster. Be careful with it since if audios are not of the '
                              'same size it will generate noise at the end of the file')
