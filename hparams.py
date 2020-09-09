@@ -120,7 +120,11 @@ class HParams:
             if '/' in value:
                 self.add_param(key, value)
             else:
-                self.add_param(key, ast.literal_eval(value))
+                # Not very clean way to implement this
+                try:
+                    self.add_param(key, ast.literal_eval(value))
+                except:
+                    self.add_param(key, value)
 
     def add_param(self, param, value):
         self.__setattr__(param, value)
@@ -142,4 +146,3 @@ class HParams:
         if hparams_string is not None:
             # HParams passed in the hparams argument has the highest priority.
             self.add_params_string(hparams_string)
-
