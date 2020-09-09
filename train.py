@@ -423,7 +423,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                                     hparams.batch_size, n_gpus, collate_fn,
                                     hparams.distributed_run, rank)
                 if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.pt'
+                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
                     checkpoint_path = output_directory + name
                     save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
                                     checkpoint_path)
@@ -436,7 +436,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
                             os.remove(best_val_loss_path)
                         best_val_loss = val_loss
                         best_val_loss_path = checkpoint_path
-                    wandb.save(output_directory + '/*.pt')
+                    wandb.save(output_directory + '/*.ckpt')
 
                     prev_check = checkpoint_path
                 prev_val_loss = val_loss
@@ -473,7 +473,7 @@ if __name__ == '__main__':
         hparams.disc_warmp_up = 0
 
     name = f"{'vesus' if hparams.vesus_path is not None else ''}LJ-" \
-           f"{'encL-' if hparams.encoder_emotions else ''}" \
+           f"{'encIn-' if hparams.encoder_inputs else ''}" \
            f"{hparams.noise_size}n-" \
            f"{'intended' if hparams.use_intended_labels and hparams.use_labels else ''}" \
            f"{'labels' if hparams.use_labels else 'NOlabels'}" \
@@ -495,10 +495,10 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", hparams.cudnn_enabled)
     print("cuDNN Benchmark:", hparams.cudnn_benchmark)
 
-    wandb.init(project="Compare", config=hparams.__dict__, name=name, notes=args.notes)
+    wandb.init(project="Compare", config=hparams.__dict__, name=name, notes=args.notes, tags=f'v{hparams.version}')
     if args.output_directory is None:
         args.output_directory = wandb.run.dir + '/output'
 
-    wandb.save(args.output_directory + "/*.pt")
+    wandb.save(args.output_directory + "/*.ckpt")
     train(args.output_directory, args.checkpoint_path,
           args.warm_start, args.n_gpus, args.rank, args.group_name, hparams, args.wavs_path)

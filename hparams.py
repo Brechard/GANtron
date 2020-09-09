@@ -7,6 +7,7 @@ from text import symbols
 class HParams:
     def __init__(self, hparams_string=None):
         """Create model hyperparameters. Parse nondefault from given string."""
+        self.version = 0.6
         ################################
         # Experiment Parameters        #
         ################################
@@ -39,6 +40,7 @@ class HParams:
         self.training_files = ['filelists/ljs_audio_text_train_filelist.txt', 'filelists/vesus_train.txt']
         self.validation_files = ['filelists/ljs_audio_text_val_filelist.txt', 'filelists/vesus_val.txt']
         self.text_cleaners = ['english_cleaners']
+        self.n_labels = 5
 
         ################################
         # Audio Parameters             #
@@ -95,8 +97,8 @@ class HParams:
         self.gradient_penalty_lambda = 0
         self.noise_size = 20
         self.disc_warmp_up = 500
-        self.discriminator_type = 'linear'
-        self.encoder_emotions = False
+        self.discriminator_type = 'conv'
+        self.encoder_inputs = True
 
         ################################
         # Optimization Hyperparameters #

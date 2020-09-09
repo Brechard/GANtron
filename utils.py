@@ -78,7 +78,7 @@ def calculate_emotions(labeled_emotions, labeled_intensities):
     return emotions
 
 
-def load_vesus(filename: str, wavs_path: str, split: str = "|", use_labels: bool = 'one', use_text: bool = True):
+def load_vesus(filename: str, wavs_path: str, split: str = "|", use_labels: str = 'one', use_text: bool = True):
     """
 
     Args:

@@ -1,15 +1,18 @@
 import random
 from math import sqrt
 
+import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 
 from layers import ConvNorm, LinearNorm, DiscConv1d, DiscDense
-from utils import to_gpu, get_mask_from_lengths
 from text import text_to_sequence
-import numpy as np
+from utils import to_gpu, get_mask_from_lengths
+
+
+
 
 class LocationLayer(nn.Module):
     def __init__(self, attention_n_filters, attention_kernel_size,
@@ -158,11 +161,16 @@ class Encoder(nn.Module):
 
     def __init__(self, hparams):
         super(Encoder, self).__init__()
-
+        self.noise_size = hparams.noise_size if hparams.encoder_inputs else 0
+        self.fp16 = hparams.fp16_run
         convolutions = []
-        for _ in range(hparams.encoder_n_convolutions):
+        for i in range(hparams.encoder_n_convolutions):
+            in_dim = hparams.encoder_embedding_dim
+            if i == 0 and hparams.encoder_inputs:
+                in_dim += hparams.n_labels if hparams.use_labels else 0
+                in_dim += hparams.noise_size if hparams.use_noise else 0
             conv_layer = nn.Sequential(
-                ConvNorm(hparams.encoder_embedding_dim,
+                ConvNorm(in_dim,
                          hparams.encoder_embedding_dim,
                          kernel_size=hparams.encoder_kernel_size, stride=1,
                          padding=int((hparams.encoder_kernel_size - 1) / 2),
@@ -175,7 +183,17 @@ class Encoder(nn.Module):
                             int(hparams.encoder_embedding_dim / 2), 1,
                             batch_first=True, bidirectional=True)
 
+    def append_noise(self, x):
+        if self.noise_size > 0:
+            noise = torch.rand(x.size(0), self.noise_size, 1).repeat_interleave(x.size(2), dim=2).cuda()
+            if self.fp16:
+                noise = noise.half()
+            x = torch.cat([x, noise], dim=1)
+        return x
+
     def forward(self, x, input_lengths):
+        x = self.append_noise(x)
+
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
 
@@ -195,6 +213,7 @@ class Encoder(nn.Module):
         return outputs
 
     def inference(self, x):
+        x = append_noise(x, self.noise_size, self.fp16)
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
 
@@ -219,12 +238,12 @@ class Decoder(nn.Module):
         self.gate_threshold = hparams.gate_threshold
         self.p_attention_dropout = hparams.p_attention_dropout
         self.p_decoder_dropout = hparams.p_decoder_dropout
-        self.noise_size = hparams.noise_size
+        self.noise_size = 0 if hparams.encoder_inputs else hparams.noise_size
         self.fp16 = hparams.fp16_run
-        decoder_in_dim = hparams.encoder_embedding_dim + hparams.noise_size
+        decoder_in_dim = hparams.encoder_embedding_dim + self.noise_size
         if hparams.vesus_path:
             decoder_in_dim += hparams.speakers_embedding
-            if hparams.use_labels:
+            if hparams.use_labels and not hparams.encoder_inputs:
                 decoder_in_dim += 5
 
         self.prenet = Prenet(
@@ -251,6 +270,15 @@ class Decoder(nn.Module):
         self.gate_layer = LinearNorm(
             hparams.decoder_rnn_dim + decoder_in_dim, 1,
             bias=True, w_init_gain='sigmoid')
+
+    def append_noise(self, x):
+        if self.noise_size > 0:
+            noise = torch.rand(x.size(0), 1, self.noise_size).repeat_interleave(x.size(1), dim=1).cuda()
+            if self.fp16:
+                noise = noise.half()
+            x = torch.cat([x, noise], dim=-1)
+        return x
+
 
     def get_go_frame(self, memory):
         """ Gets all zeros frames to use as first decoder input
@@ -404,11 +432,7 @@ class Decoder(nn.Module):
         gate_outputs: gate outputs from the decoder
         alignments: sequence of attention weights from the decoder
         """
-        if self.noise_size > 0:
-            noise = torch.rand(memory.size(0), 1, self.noise_size).repeat_interleave(memory.size(1), dim=1).cuda()
-            if self.fp16:
-                noise = noise.half()
-            memory = torch.cat([memory, noise], dim=-1)
+        memory = self.append_noise(memory)
 
         decoder_input = self.get_go_frame(memory).unsqueeze(0)
         decoder_inputs = self.parse_decoder_inputs(decoder_inputs)
@@ -575,10 +599,7 @@ class Tacotron2(nn.Module):
         self.n_frames_per_step = hparams.n_frames_per_step
 
         symbols_embedding_dim = hparams.symbols_embedding_dim
-        self.encoder_emotions = False
-        if hparams.encoder_emotions:
-            self.encoder_emotions = True
-            symbols_embedding_dim -= 5
+        self.encoder_inputs = hparams.encoder_inputs
 
         self.embedding = nn.Embedding(
             hparams.n_symbols, symbols_embedding_dim)
@@ -628,7 +649,7 @@ class Tacotron2(nn.Module):
         text_lengths, output_lengths = text_lengths.data, output_lengths.data
 
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
-        if self.encoder_emotions:
+        if self.encoder_inputs and self.use_labels:
             emotions_enc = emotions[:, :, None].repeat(1, 1, embedded_inputs.size(-1))
             embedded_inputs = torch.cat((embedded_inputs, emotions_enc), dim=1)
 
@@ -638,7 +659,7 @@ class Tacotron2(nn.Module):
             embedded_speaker = self.speaker_embedding(speaker_ids)[:, None]
             # Repeat the speaker and emotion for each part of the embedded text for the attention mechanism
             embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
-            if self.use_labels and not self.encoder_emotions:
+            if self.use_labels and not self.encoder_inputs:
                 embedded_emotions = emotions[:, None].repeat(1, encoder_outputs.size(1), 1)
                 encoder_outputs = torch.cat((encoder_outputs, embedded_speaker, embedded_emotions), dim=2)
             else:
