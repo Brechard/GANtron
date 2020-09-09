@@ -98,7 +98,7 @@ class HParams:
         self.noise_size = 20
         self.disc_warmp_up = 500
         self.discriminator_type = 'conv'
-        self.encoder_inputs = True
+        self.encoder_inputs = False
 
         ################################
         # Optimization Hyperparameters #

@@ -58,7 +58,10 @@ class HParams:
             if '/' in value:
                 self.add_param(key, value)
             else:
-                self.add_param(key, ast.literal_eval(value))
+                try:
+                    self.add_param(key, ast.literal_eval(value))
+                except:
+                    self.add_param(key, value)
 
     def add_param(self, param, value):
         self.__setattr__(param, value)

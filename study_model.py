@@ -109,7 +109,7 @@ def inference_samples(output_path, hparams, text):
     force_style_emotions(gantron, input_sequence=sequence, output_path=f"{output_path}/GANtronInference/",
                          n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
                          force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples,
-                         style_shape=[sequence.size(1), hparams.noise_size])
+                         style_shape=[sequence.size(1), hparams.noise_size], predefined=hparams.predefined)
 
 
 def prepare_data(file_paths, n_groups):
@@ -200,6 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_groups', default=6, type=int, required=False,
                         help='Number of different groups to generate and classify.')
     parser.add_argument('--force_emotions', default=None, type=str2bool, help='Force using/not labels when generating')
+    parser.add_argument('--predefined', default=False, type=str2bool, help='Use predefined labels or random labels in the groups.')
     parser.add_argument('--force_noise', default=None, type=str2bool, help='Force using/not noise when generating')
     parser.add_argument('--int_labels', action='store_true', help='Use integer values for the labels')
 

@@ -213,7 +213,7 @@ class Encoder(nn.Module):
         return outputs
 
     def inference(self, x):
-        x = append_noise(x, self.noise_size, self.fp16)
+        x = self.append_noise(x)
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
 

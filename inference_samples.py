@@ -40,7 +40,7 @@ def generate_audio(waveglow, mel_spectrogram):
 
 
 def force_style_emotions(gantron, input_sequence, output_path, speaker, force_emotions, force_style, style_shape=None,
-                         n_groups=6, n_samples_styles=20, simple_name=False, int_emotions=False):
+                         n_groups=6, n_samples_styles=20, simple_name=False, int_emotions=False, predefined=False):
     """
     Inference a given number of samples where the style or the emotion is forced.
 
@@ -57,6 +57,7 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
         simple_name: If name is simple it will be: groupId-nFile.wav, otherwise it will indicate if it was forced style
         and/or forced emotion.
         int_emotions: Set the emotions as only integers.
+        predefined: Flag to use the predefined emotions or to make groups of random values.
     Returns:
         None
     """
@@ -74,7 +75,7 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                 torch.FloatTensor([[0, 0, 0, 0, 1]]).cuda(),
                 torch.FloatTensor([[0, 0, 0, 0, 0]]).cuda()
             ]
-        else:
+        elif predefined:
             emotions = [
                            # [Neutral, Angry, Happy, Sad, Fearful]
                            torch.FloatTensor([[0.6, 0, 0, 0, 0]]).cuda(),
@@ -83,6 +84,8 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                            torch.FloatTensor([[0, 0, 0, 0.8, 0]]).cuda(),
                            torch.FloatTensor([[0, 0, 0, 0, 0.75]]).cuda()
                        ] + [torch.rand(1, 5).cuda() for i in range(n_groups - 5)]
+        else:
+            emotions = [torch.rand(1, 5).cuda() for i in range(n_groups)]
     if force_style:
         styles = [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
                   range(n_groups)]
