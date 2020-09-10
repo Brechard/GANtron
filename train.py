@@ -476,7 +476,7 @@ if __name__ == '__main__':
            f"{'encIn-' if hparams.encoder_inputs else ''}" \
            f"{hparams.noise_size}n-" \
            f"{'intended' if hparams.use_intended_labels and hparams.use_labels else ''}" \
-           f"{'labels' if hparams.use_labels else 'NOlabels'}" \
+           f"{'labels' if hparams.use_labels and hparams.vesus_path else 'NOlabels'}" \
 
     print('\033[94m', f'Run {name} started', '\033[0m')
     if args.waveglow_path:
