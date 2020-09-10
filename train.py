@@ -450,7 +450,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_directory', type=str, required=False, help='directory to save checkpoints')
     parser.add_argument('-c', '--checkpoint_path', type=str, default=None, required=False, help='checkpoint path')
-    parser.add_argument('--waveglow_path', type=str, default=None, required=False, help='WaveGlow path to use in validation')
+    parser.add_argument('--waveglow_path', type=str, default=None, required=False,
+                        help='WaveGlow path to use in validation')
     parser.add_argument('--vesus_path', type=str, default=None, help='Vesus dataset path to use')
     parser.add_argument('--warm_start', action='store_true', help='load model weights only, ignore specified layers')
     parser.add_argument('--n_gpus', type=int, default=1, required=False, help='number of gpus')
@@ -477,10 +478,12 @@ if __name__ == '__main__':
            f"{hparams.noise_size}n-" \
            f"{'intended' if hparams.use_intended_labels and hparams.use_labels else ''}" \
            f"{'labels' if hparams.use_labels and hparams.vesus_path else 'NOlabels'}" \
+           f"-{'cD' if hparams.discriminator_type != 'linear' else 'lD'}"
 
     print('\033[94m', f'Run {name} started', '\033[0m')
     if args.waveglow_path:
         import sys
+
         sys.path.append('WaveGlow/')
 
     real = 1
