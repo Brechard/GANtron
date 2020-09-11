@@ -183,10 +183,11 @@ class Encoder(nn.Module):
                             int(hparams.encoder_embedding_dim / 2), 1,
                             batch_first=True, bidirectional=True)
 
-    def append_noise(self, x):
+    def append_noise(self, x, noise=None):
         if self.noise_size > 0:
-            noise = torch.rand(x.size(0), self.noise_size, 1).repeat_interleave(x.size(2), dim=2).cuda()
-            if self.fp16:
+            if noise is None:
+                noise = torch.rand(x.size(0), self.noise_size, 1).repeat_interleave(x.size(2), dim=2).cuda()
+            if self.fp16 and noise.dtype == torch.float32:
                 noise = noise.half()
             x = torch.cat([x, noise], dim=1)
         return x
@@ -212,8 +213,8 @@ class Encoder(nn.Module):
 
         return outputs
 
-    def inference(self, x):
-        x = self.append_noise(x)
+    def inference(self, x, style=None):
+        x = self.append_noise(x, style)
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
 
@@ -592,6 +593,7 @@ class Tacotron2(nn.Module):
         super(Tacotron2, self).__init__()
         if not hparams.use_noise:
             hparams.noise_size = 0
+        hparams.use_labels = hparams.use_labels if hparams.vesus_path else False
 
         self.mask_padding = hparams.mask_padding
         self.fp16_run = hparams.fp16_run
@@ -675,14 +677,13 @@ class Tacotron2(nn.Module):
             [mel_outputs, mel_outputs_postnet, gate_outputs, alignments],
             output_lengths)
 
-    def inference(self, text_inputs, style=None, emotions=None, encoder_emotions=False, speaker=None):
+    def inference(self, text_inputs, style=None, emotions=None, speaker=None):
         """
         Inference a spectrogram given the inputs
         Args:
             text_inputs: Either already transformed text or raw string that will be converted
             style: Style to use (input noise), if None and needed it will be created randomly.
             emotions: Label of emotions to use.
-            encoder_emotions: If the emotions are used as input of the encoder or the decoder.
             speaker: torch.LongTensor([speaker_id])
 
         Returns:
@@ -696,7 +697,12 @@ class Tacotron2(nn.Module):
             emotions = torch.rand(1, 5).cuda()
 
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
-        encoder_outputs = self.encoder.inference(embedded_inputs)
+        if self.encoder_inputs:
+            if emotions is not None:
+                emotions_enc = emotions[:, :, None].repeat(1, 1, embedded_inputs.size(-1))
+                embedded_inputs = torch.cat((embedded_inputs, emotions_enc), dim=1)
+
+        encoder_outputs = self.encoder.inference(embedded_inputs, style)
 
         if speaker is not None:
             embedded_speaker = self.speaker_embedding(speaker)[:, None]
@@ -704,7 +710,7 @@ class Tacotron2(nn.Module):
             embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
             encoder_outputs = torch.cat((encoder_outputs, embedded_speaker), dim=2)
 
-        if emotions is not None and not encoder_emotions:
+        if emotions is not None and not self.encoder_inputs:
             emotions = emotions[:, None].repeat(1, encoder_outputs.size(1), 1)
             encoder_outputs = torch.cat((encoder_outputs, emotions), dim=2)
 

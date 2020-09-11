@@ -100,7 +100,8 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                 emotion = emotions[st]
             mel_outputs_postnet = gantron.inference(input_sequence, style, emotions=emotion, speaker=speaker)[1]
             if simple_name:
-                name = f'{st}-{i}'
+                name = f'{st}-{i}' + ('-' + ','.join(
+                    [str(round(i, 2)) for i in emotion[0].cpu().numpy()])) if force_emotions else ''
             else:
                 name = ''
                 if force_emotions:

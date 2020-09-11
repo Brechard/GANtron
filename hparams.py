@@ -95,7 +95,7 @@ class HParams:
         self.d_freq = 1
         self.clipping_value = 0.001
         self.gradient_penalty_lambda = 0
-        self.noise_size = 20
+        self.noise_size = 512
         self.disc_warmp_up = 500
         self.discriminator_type = 'conv'
         self.encoder_inputs = False

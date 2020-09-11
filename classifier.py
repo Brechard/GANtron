@@ -187,13 +187,14 @@ class Classifier(pl.LightningModule, ABC):
         return output
 
 
-def load_npy_mels(filepaths_lists, hparams):
+def load_npy_mels(filepaths_lists, hparams, file_format='.wav'):
     """
     Save all mel spectrograms as np files so they can be loaded much faster.
 
     Args:
         filepaths_lists: List with the filepaths to the files containing the filepaths for train, val and test
         hparams: Hyperparameters for loading the mel spectrograms
+        file_format: Format of the file, defaults to .wav
 
     Returns:
         List with the new filepaths
@@ -206,22 +207,23 @@ def load_npy_mels(filepaths_lists, hparams):
         new_filepaths_list = []
         a = 0
         for path in progress_bar:
-            if not os.path.exists(path.split('.')[0] + '.npy'):
-                load_mel(path, hparams)
-            new_filepaths_list.append(path.split('.')[0] + '.npy')
+            new_path = path.split(file_format)[0] + '.npy'
+            if not os.path.exists(new_path):
+                load_mel(path, hparams, new_path)
+            new_filepaths_list.append(new_path)
             a += 1
         new_filepaths_lists.append(new_filepaths_list)
 
     return new_filepaths_lists
 
 
-def load_mel(path, hparams):
+def load_mel(path, hparams, new_path):
     melspec = librosa.power_to_db(
         librosa.feature.melspectrogram(librosa.load(path)[0],
                                        sr=hparams.sampling_rate, n_fft=hparams.n_ftt,
                                        n_mels=hparams.n_mel_channels, hop_length=hparams.hop_length),
         ref=np.max)
-    np.save(path.split('.')[0] + '.npy', melspec)
+    np.save(new_path, melspec)
 
 
 def load_files(files, audio_path, use_labels):
@@ -309,4 +311,4 @@ if __name__ == '__main__':
     if not hp.linear_model and hp.n_frames % 8 != 0:
         raise argparse.ArgumentTypeError("Due to the three MaxPool layers, n_frames must be a multiple of 8")
 
-    train(hp, audio_path=args.audio_path, project='Classifier', name=name)
+    train(args.audio_path, hp)

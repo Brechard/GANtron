@@ -73,16 +73,20 @@ def generate_audio(batch_paths, hparams, max_len, mels, new_paths, output_path, 
     with torch.no_grad():
         audios = waveglow.infer(mels, sigma=0.666)
     for i in range(len(audios)):
-        new_path = f"{output_path}/WaveGlowInference/{batch_paths[i].split('.')[0]}.wav"
+        new_path = f"{output_path}/WaveGlowInference/{batch_paths[i].split('.npy')[0]}.wav"
         sf.write(new_path, audios[i].to(torch.float32).data.cpu().numpy(), 22050)
-        group = batch_paths[i].split('.')[0].split('-')[0]
+        file_info = batch_paths[i].split('.npy')[0].split('-')
+        group = file_info[0]
+        emotion = file_info[2] if len(file_info) == 3 else ''
         if group not in sampled:
             sampled[group] = [
-                wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(), caption=f'Group = {group} - 0',
+                wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(),
+                            caption=f'Group = {group} - 0' + (' - ' + emotion) if emotion != '' else emotion,
                             sample_rate=22050)]
         elif len(sampled[group]) == 1:
             sampled[group].append(
-                wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(), caption=f'Group = {group} - 1',
+                wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(),
+                            caption=f'Group = {group} - 1' + (' - ' + emotion) if emotion != '' else emotion,
                             sample_rate=22050))
 
         new_paths.append(new_path)
@@ -116,7 +120,7 @@ def prepare_data(file_paths, n_groups):
     labels = np.zeros((len(file_paths), n_groups))
     for i, filepath in enumerate(file_paths):
         filename = filepath.split('/')[-1].split('.')[0]
-        group, id = filename.split('-')
+        group = filename.split('-')[0]
         label = np.zeros(n_groups)
         label[int(group)] = 1
         labels[i] = label
@@ -200,7 +204,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_groups', default=6, type=int, required=False,
                         help='Number of different groups to generate and classify.')
     parser.add_argument('--force_emotions', default=None, type=str2bool, help='Force using/not labels when generating')
-    parser.add_argument('--predefined', default=False, type=str2bool, help='Use predefined labels or random labels in the groups.')
+    parser.add_argument('--predefined', default=True, type=str2bool, help='Use predefined labels or random labels in the groups.')
     parser.add_argument('--force_noise', default=None, type=str2bool, help='Force using/not noise when generating')
     parser.add_argument('--int_labels', action='store_true', help='Use integer values for the labels')
 
