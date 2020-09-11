@@ -180,7 +180,7 @@ def validate(model, criterion, valset, iteration, batch_size, n_gpus,
         for i, batch in enumerate(val_loader):
             x, y = model.parse_batch(batch)
             y_pred = model(x)
-            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[1], x[4])
+            mel_loss, gate_loss, attn_loss = criterion(y_pred, y, x[1], x[-1])
             if distributed_run:
                 reduced_mel_val_loss = reduce_tensor(mel_loss.data, n_gpus).item()
                 reduced_gate_val_loss = reduce_tensor(gate_loss.data, n_gpus).item()
