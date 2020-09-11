@@ -40,7 +40,8 @@ def generate_audio(waveglow, mel_spectrogram):
 
 
 def force_style_emotions(gantron, input_sequence, output_path, speaker, force_emotions, force_style, style_shape=None,
-                         n_groups=6, n_samples_styles=20, simple_name=False, int_emotions=False, predefined=False):
+                         n_groups=6, n_samples_styles=20, simple_name=False, int_emotions=False, predefined=False,
+                         encoder_input=False):
     """
     Inference a given number of samples where the style or the emotion is forced.
 
@@ -58,9 +59,11 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
         and/or forced emotion.
         int_emotions: Set the emotions as only integers.
         predefined: Flag to use the predefined emotions or to make groups of random values.
+        encoder_input: If the input is in the encoder the style is shaped differently.
     Returns:
         None
     """
+    print(f'Saving data in {output_path}')
     emotions, styles = None, None
     if force_emotions:
         if int_emotions:
@@ -87,11 +90,16 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
         else:
             emotions = [torch.rand(1, 5).cuda() for i in range(n_groups)]
     if force_style:
-        styles = [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
-                  range(n_groups)]
+        if encoder_input:
+            styles = [torch.rand(1, style_shape[1], 1).repeat_interleave(style_shape[0], dim=2).cuda() for i in
+                      range(n_groups)]
+        else:
+            styles = [torch.rand(1, 1, style_shape[1]).repeat_interleave(style_shape[0], dim=1).cuda() for i in
+                      range(n_groups)]
+
     for st in range(n_groups):
         progress_bar = tqdm(range(n_samples_styles))
-        progress_bar.set_description(f'Genearting group {st + 1} of {n_groups}')
+        progress_bar.set_description(f'Generating group {st + 1} of {n_groups}')
         for i in progress_bar:
             style, emotion = None, None
             if styles is not None:

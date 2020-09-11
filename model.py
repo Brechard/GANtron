@@ -703,6 +703,8 @@ class Tacotron2(nn.Module):
                 embedded_inputs = torch.cat((embedded_inputs, emotions_enc), dim=1)
 
         encoder_outputs = self.encoder.inference(embedded_inputs, style)
+        if self.encoder_inputs:
+            style = None
 
         if speaker is not None:
             embedded_speaker = self.speaker_embedding(speaker)[:, None]

@@ -291,7 +291,7 @@ if __name__ == '__main__':
                         help='Batch size, recommended to use a small one even if it is smaller.')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--n_frames', type=int, default=80, help='Number of frames to use for classification')
-    parser.add_argument('--precision', type=int, default=16, help='Precision 32/16 bits')
+    parser.add_argument('--precision', type=int, default=32, help='Precision 32/16 bits')
     parser.add_argument('--model_size', type=int, default=512, help='Model size')
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
     parser.add_argument('--max_noise', type=int, default=3, help='Maximum noise to add to the dataset')
