@@ -11,7 +11,8 @@ class HParams:
         ################################
         # Experiment Parameters        #
         ################################
-        self.epochs = 200
+        self.epochs = 100
+        self.iterations = None  # If number of iterations are specified, they will be used to stop training.
         self.iters_per_checkpoint = 5000
         self.seed = 1234
         self.dynamic_loss_scaling = True

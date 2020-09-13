@@ -277,7 +277,11 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
     prev_check = None
     generated_mel_list = []
     # ================ MAIN TRAINING LOOP! ===================
-    progress_bar = tqdm(range(epoch_offset, hparams.epochs))
+    n_epochs = hparams.epochs
+    if hparams.iterations is not None and hparams.iterations > 0:
+        n_epochs = int(hparams.iterations / len(train_loader)) + 1
+
+    progress_bar = tqdm(range(epoch_offset, n_epochs))
     iter_rep = 10000
     gen_warm = 5
     prev_val_loss = float('inf')
@@ -291,6 +295,7 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
             start = time.perf_counter()
             do_disc = False
             if iteration >= iter_rep and iteration - iter_rep * int(iteration / iter_rep) < 100:
+                # Every 10k iterations train discriminator for 100 iterations.
                 do_disc = True
 
             if iteration > gen_warm and (disc_times > 0 or iteration < hparams.disc_warmp_up or do_disc):
@@ -419,31 +424,46 @@ def train(output_directory, checkpoint_path, warm_start, n_gpus,
 
             iteration += 1
             if not is_overflow and (iteration % hparams.iters_per_checkpoint == 0):
-                val_loss = validate(generator, criterion, valset, iteration,
-                                    hparams.batch_size, n_gpus, collate_fn,
-                                    hparams.distributed_run, rank)
-                if rank == 0:
-                    name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
-                    checkpoint_path = output_directory + name
-                    save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
-                                    checkpoint_path)
-                    wandb.save(checkpoint_path)
-                    if prev_check is not None and val_loss < prev_val_loss:
-                        os.remove(prev_check)
+                val_out = validation_step(best_val_loss, best_val_loss_path, collate_fn, criterion, d_learning_rate,
+                                          d_optimizer, g_learning_rate, g_optimizer, generator, hparams, iteration,
+                                          n_gpus, output_directory, prev_check, prev_val_loss, rank, valset)
 
-                    if val_loss < best_val_loss:
-                        if best_val_loss_path is not None and os.path.exists(best_val_loss_path):
-                            os.remove(best_val_loss_path)
-                        best_val_loss = val_loss
-                        best_val_loss_path = checkpoint_path
-                    wandb.save(output_directory + '/*.ckpt')
-
-                    prev_check = checkpoint_path
-                prev_val_loss = val_loss
+                prev_val_loss, best_val_loss, best_val_loss_path, prev_check = val_out
 
             if iteration % hparams.reduce_lr_steps_every == 0 and hparams.reduce_lr_steps_every > 0:
                 g_learning_rate /= 2
                 d_learning_rate /= 2
+            if hparams.iterations is not None and iteration >= hparams.iterations:
+                validation_step(best_val_loss, best_val_loss_path, collate_fn, criterion, d_learning_rate,
+                                d_optimizer, g_learning_rate, g_optimizer, generator, hparams, iteration,
+                                n_gpus, output_directory, prev_check, prev_val_loss, rank, valset)
+                return
+
+
+def validation_step(best_val_loss, best_val_loss_path, collate_fn, criterion, d_learning_rate, d_optimizer,
+                    g_learning_rate, g_optimizer, generator, hparams, iteration, n_gpus, output_directory, prev_check,
+                    prev_val_loss, rank, valset):
+    val_loss = validate(generator, criterion, valset, iteration,
+                        hparams.batch_size, n_gpus, collate_fn,
+                        hparams.distributed_run, rank)
+    if rank == 0:
+        file_name = f'/iter={iteration}_val-loss={round(val_loss, 6)}.ckpt'
+        checkpoint_path = output_directory + file_name
+        save_checkpoint(generator, g_optimizer, g_learning_rate, d_optimizer, d_learning_rate, iteration,
+                        checkpoint_path)
+        wandb.save(checkpoint_path)
+        if prev_check is not None and val_loss < prev_val_loss:
+            os.remove(prev_check)
+
+        if val_loss < best_val_loss:
+            if best_val_loss_path is not None and os.path.exists(best_val_loss_path):
+                os.remove(best_val_loss_path)
+            best_val_loss = val_loss
+            best_val_loss_path = checkpoint_path
+        wandb.save(output_directory + '/*.ckpt')
+
+        prev_check = checkpoint_path
+    return val_loss, best_val_loss, best_val_loss_path, prev_check
 
 
 if __name__ == '__main__':

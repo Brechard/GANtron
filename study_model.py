@@ -142,10 +142,11 @@ def study_model(output_path, hparams, text):
     inference_samples(output_path, hparams, text)
     files_paths, sampled = compute_wav(output_path, hparams)
     files_paths = load_npy_mels([files_paths], hparams)
-    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled)
+    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, hparams.predefined,
+                     hparams.force_emotions)
 
 
-def train_classifier(output_path, files_paths, n_groups, notes, sampled=None):
+def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False):
     hparams_classifier = HPC()
     hparams_classifier.n_emotions = n_groups
     classifier = Classifier(hparams_classifier)
@@ -169,7 +170,7 @@ def train_classifier(output_path, files_paths, n_groups, notes, sampled=None):
     name = output_path.split('/')[-1]
     if name is None or name == '':
         name = output_path.split('/')[-2]
-    name += '-predefined' if hp.predefined else '-nonPredefined'
+    name += '-predefined' if predefined and force_emotions else '-nonPredefined'
     wandb_logger = WandbLogger(project='Study models', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     wandb_logger.experiment.notes = notes
