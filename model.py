@@ -706,7 +706,7 @@ class Tacotron2(nn.Module):
         if self.encoder_inputs:
             style = None
 
-        if speaker is not None:
+        if speaker is not None and hasattr(self, 'speaker_embedding'):
             embedded_speaker = self.speaker_embedding(speaker)[:, None]
             # Repeat the speaker and emotion for each part of the embedded text for the attention mechanism
             embedded_speaker = embedded_speaker.repeat(1, encoder_outputs.size(1), 1)
