@@ -169,7 +169,8 @@ def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, pr
     name = output_path.split('/')[-1]
     if name is None or name == '':
         name = output_path.split('/')[-2]
-    name += '-predefined' if predefined and force_emotions else '-nonPredefined'
+    if force_emotions:
+        name += '-predefined' if predefined else '-nonPredefined'
     wandb_logger = WandbLogger(project='Study models', name=name, log_model=True)
     wandb_logger.log_hyperparams(args)
     wandb_logger.experiment.notes = notes
