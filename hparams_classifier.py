@@ -11,7 +11,7 @@ class HParams:
         # Experiment Parameters        #
         ################################
         self.epochs = 100
-        self.precision = 16
+        self.precision = 32
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
         self.use_labels = 'intended'

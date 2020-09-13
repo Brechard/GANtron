@@ -114,7 +114,7 @@ def inference_samples(output_path, hparams, text):
                          n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
                          force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples,
                          style_shape=[sequence.size(1), hparams.noise_size], predefined=hparams.predefined,
-                         encoder_input=hparams.encoder_inputs)
+                         encoder_input=hparams.encoder_inputs, int_emotions=hparams.int_labels)
 
 
 def prepare_data(file_paths, n_groups):
