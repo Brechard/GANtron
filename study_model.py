@@ -138,12 +138,11 @@ def prepare_data(file_paths, n_groups):
     return train_paths, train_groups, val_paths, val_groups, test_paths, test_groups
 
 
-def study_model(output_path, hparams, text):
+def study_model(output_path, hparams, text, predefined, force_emotions):
     inference_samples(output_path, hparams, text)
     files_paths, sampled = compute_wav(output_path, hparams)
     files_paths = load_npy_mels([files_paths], hparams)
-    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, hparams.predefined,
-                     hparams.force_emotions)
+    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, predefined, force_emotions)
 
 
 def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False):
@@ -219,4 +218,5 @@ if __name__ == '__main__':
     hp = HParams()
     hp.add_params(args)
 
-    study_model(args.output_path, hp, text="Emotional speech synthesis")
+    study_model(args.output_path, hp, text="Emotional speech synthesis", predefined=args.predefined,
+                force_emotions=args.force_emotions)
