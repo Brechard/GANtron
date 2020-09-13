@@ -81,12 +81,12 @@ def generate_audio(batch_paths, hparams, max_len, mels, new_paths, output_path, 
         if group not in sampled:
             sampled[group] = [
                 wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(),
-                            caption=f'Group = {group} - 0' + (' - ' + emotion) if emotion != '' else emotion,
+                            caption=f'Group = {group} - 0' + ((' - ' + emotion) if emotion != '' else emotion),
                             sample_rate=22050)]
         elif len(sampled[group]) == 1:
             sampled[group].append(
                 wandb.Audio(audios[i].to(torch.float32).data.cpu().numpy(),
-                            caption=f'Group = {group} - 1' + (' - ' + emotion) if emotion != '' else emotion,
+                            caption=f'Group = {group} - 1' + ((' - ' + emotion) if emotion != '' else emotion),
                             sample_rate=22050))
 
         new_paths.append(new_path)
