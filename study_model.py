@@ -110,11 +110,12 @@ def inference_samples(output_path, hparams, text):
     force_emotions = hparams.force_emotions if hasattr(hparams, 'force_emotions') else hparams.use_labels
     force_noise = hparams.force_noise if hasattr(hparams, 'force_noise') else hparams.use_noise
 
-    force_style_emotions(gantron, input_sequence=sequence, output_path=f"{output_path}/GANtronInference/",
-                         n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
-                         force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples,
-                         style_shape=[sequence.size(1), hparams.noise_size], predefined=hparams.predefined,
-                         encoder_input=hparams.encoder_inputs, int_emotions=hparams.int_labels)
+    return force_style_emotions(gantron, input_sequence=sequence, output_path=f"{output_path}/GANtronInference/",
+                                n_groups=hparams.n_groups, speaker=speaker, force_emotions=force_emotions,
+                                force_style=force_noise, simple_name=True, n_samples_styles=hparams.samples,
+                                style_shape=[sequence.size(1), hparams.noise_size], predefined=hparams.predefined,
+                                encoder_input=hparams.encoder_inputs, int_emotions=hparams.int_labels,
+                                max_decoder_steps=hparams.max_decoder_steps)
 
 
 def prepare_data(file_paths, n_groups):
@@ -139,13 +140,13 @@ def prepare_data(file_paths, n_groups):
 
 
 def study_model(output_path, hparams, text, predefined, force_emotions):
-    inference_samples(output_path, hparams, text)
+    max_decoder_steps_reached = inference_samples(output_path, hparams, text)
     files_paths, sampled = compute_wav(output_path, hparams)
     files_paths = load_npy_mels([files_paths], hparams)
-    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, predefined, force_emotions)
+    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, predefined, force_emotions, max_decoder_steps_reached)
 
 
-def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False):
+def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False, max_decoder_steps_reached=None):
     hparams_classifier = HPC()
     hparams_classifier.n_emotions = n_groups
     classifier = Classifier(hparams_classifier)
@@ -179,6 +180,9 @@ def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, pr
         for i in list(sampled.values()):
             audios.extend(i)
         wandb_logger.experiment.log({'Audios': audios})
+    if max_decoder_steps_reached is not None:
+        wandb_logger.experiment.log({'max_decoder_steps_reached': max_decoder_steps_reached,
+                                     'Generation error rate': max_decoder_steps_reached / len(files_paths)})
     checkpoint_callback = ModelCheckpoint(filepath=wandb_logger.save_dir + '/{epoch}-{val_loss:.2f}-{acc:.4f}')
 
     trainer = pl.Trainer(max_epochs=hparams_classifier.epochs, gpus=1, logger=wandb_logger,

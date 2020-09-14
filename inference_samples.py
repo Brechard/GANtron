@@ -41,7 +41,7 @@ def generate_audio(waveglow, mel_spectrogram):
 
 def force_style_emotions(gantron, input_sequence, output_path, speaker, force_emotions, force_style, style_shape=None,
                          n_groups=6, n_samples_styles=20, simple_name=False, int_emotions=False, predefined=False,
-                         encoder_input=False):
+                         encoder_input=False, max_decoder_steps=500):
     """
     Inference a given number of samples where the style or the emotion is forced.
 
@@ -60,11 +60,13 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
         int_emotions: Set the emotions as only integers.
         predefined: Flag to use the predefined emotions or to make groups of random values.
         encoder_input: If the input is in the encoder the style is shaped differently.
+        max_decoder_steps: Number of maximum steps in GANtron, used to count the number of files that were forced to stop.
     Returns:
         None
     """
     print(f'Saving data in {output_path}')
     emotions, styles = None, None
+    max_decoder_steps_reached = 0
     if force_emotions:
         if int_emotions:
             if n_groups > 6:
@@ -107,6 +109,8 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
             if emotions is not None:
                 emotion = emotions[st]
             mel_outputs_postnet = gantron.inference(input_sequence, style, emotions=emotion, speaker=speaker)[1]
+            if mel_outputs_postnet.shape[-1] == max_decoder_steps:
+                max_decoder_steps_reached += 1
             if simple_name:
                 name = f'{st}-{i}' + (
                     ('-' + ','.join([str(round(i, 2)) for i in emotion[0].cpu().numpy()])) if force_emotions else '')
@@ -118,6 +122,8 @@ def force_style_emotions(gantron, input_sequence, output_path, speaker, force_em
                     name += f'style-{st}-'
                 name += f'{i}'
             np.save(f'{output_path}/{name}.npy', mel_outputs_postnet[0].data.cpu().numpy())
+
+    return max_decoder_steps_reached
 
 
 def random_style():
