@@ -240,22 +240,14 @@ def load_files(files, audio_path, use_labels):
     return filepaths, emotions
 
 
-def load_extension(extend_path, use_labels, train_filepaths, train_emotions, val_filepaths, val_emotions,
-                   test_filepaths, test_emotions):
+def load_extension(extend_path, use_labels, train_filepaths, train_emotions):
     function = (lambda x: 1 if float(x) > 0 else 0) if use_labels in ['one', 'intended'] else float
     for file in os.listdir(extend_path):
         if '.wav' not in file or file[0] == '5':
             continue
         label = np.array([function(i) for i in file.split('.wav')[0].split('-')[-1].split(',')])
-        if np.random.random() < 0.8:
-            train_filepaths.append(extend_path + file)
-            train_emotions.append(label)
-        elif np.random.random() < 0.25:
-            val_filepaths.append(extend_path + file)
-            val_emotions.append(label)
-        else:
-            test_filepaths.append(extend_path + file)
-            test_emotions.append(label)
+        train_filepaths.append(extend_path + file)
+        train_emotions.append(label)
 
 
 def prepare_data(audio_path, hparams, extend_path):
@@ -264,8 +256,7 @@ def prepare_data(audio_path, hparams, extend_path):
     val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels)
     test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels)
     if extend_path is not None:
-        load_extension(extend_path, hparams.use_labels, train_filepaths, train_emotions, val_filepaths, val_emotions,
-                       test_filepaths, test_emotions)
+        load_extension(extend_path, hparams.use_labels, train_filepaths, train_emotions)
 
     train_filepaths, val_filepaths, test_filepaths = load_npy_mels([train_filepaths, val_filepaths, test_filepaths],
                                                                    hparams)
@@ -329,7 +320,8 @@ if __name__ == '__main__':
 
     name = f'v{hp.model_version}-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
-           f'-{hp.use_labels}{("-ext_" + args.extend_path.split("/")[-2]) if args.extend_path is not None else ""}'
+           f'-{hp.use_labels}{("-ext_" + args.extend_path.split("/")[-3]) if args.extend_path is not None else ""}' \
+           f'{"-fp16" if args.precision == 16 else ""}'
 
     print('\033[94m', f'Run {name} started', '\033[0m')
     args.audio_path = 'C:/Users/rodri/Datasets/'
