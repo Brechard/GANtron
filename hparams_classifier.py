@@ -15,7 +15,8 @@ class HParams:
         self.cudnn_enabled = True
         self.cudnn_benchmark = False
         self.use_labels = 'intended'
-        self.model_version = '0.5'
+        self.model_version = '0.6'
+        # v0.6: Introduced the ability to train the model next to the augmented data from GANtron
 
         ################################
         # Data Parameters             #

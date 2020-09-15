@@ -240,11 +240,33 @@ def load_files(files, audio_path, use_labels):
     return filepaths, emotions
 
 
-def prepare_data(audio_path, hparams):
+def load_extension(extend_path, use_labels, train_filepaths, train_emotions, val_filepaths, val_emotions,
+                   test_filepaths, test_emotions):
+    function = (lambda x: 1 if float(x) > 0 else 0) if use_labels in ['one', 'intended'] else float
+    for file in os.listdir(extend_path):
+        if '.wav' not in file or file[0] == '5':
+            continue
+        label = np.array([function(i) for i in file.split('.wav')[0].split('-')[-1].split(',')])
+        if np.random.random() < 0.8:
+            train_filepaths.append(extend_path + file)
+            train_emotions.append(label)
+        elif np.random.random() < 0.25:
+            val_filepaths.append(extend_path + file)
+            val_emotions.append(label)
+        else:
+            test_filepaths.append(extend_path + file)
+            test_emotions.append(label)
+
+
+def prepare_data(audio_path, hparams, extend_path):
     max_noise, mel_offset, bs = hparams.max_noise, hparams.mel_offset, hparams.batch_size
     train_filepaths, train_emotions = load_files(hparams.training_files, audio_path, hparams.use_labels)
     val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels)
     test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels)
+    if extend_path is not None:
+        load_extension(extend_path, hparams.use_labels, train_filepaths, train_emotions, val_filepaths, val_emotions,
+                       test_filepaths, test_emotions)
+
     train_filepaths, val_filepaths, test_filepaths = load_npy_mels([train_filepaths, val_filepaths, test_filepaths],
                                                                    hparams)
 
@@ -260,8 +282,8 @@ def prepare_data(audio_path, hparams):
     return train_loader, val_loader, test_loader
 
 
-def train(audio_path, hparams):
-    train_loader, val_loader, test_loader = prepare_data(audio_path, hparams)
+def train(audio_path, hparams, extend_path):
+    train_loader, val_loader, test_loader = prepare_data(audio_path, hparams, extend_path)
 
     model = Classifier(hparams.__dict__)
 
@@ -296,6 +318,8 @@ if __name__ == '__main__':
     parser.add_argument('--mel_offset', type=int, default=20, help='Mel offset when loading the frames')
     parser.add_argument('--max_noise', type=int, default=3, help='Maximum noise to add to the dataset')
     parser.add_argument('--hparams', type=str, default=None, help='Comma separated name=value pairs')
+    parser.add_argument('--extend_path', type=str, default=None,
+                        help='Path to the dataset that will be used to extend the current ones')
 
     args = parser.parse_args()
     hp = HParams()
@@ -305,10 +329,11 @@ if __name__ == '__main__':
 
     name = f'v{hp.model_version}-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
-           f'-{hp.use_labels}'
+           f'-{hp.use_labels}{("-ext_" + args.extend_path.split("/")[-2]) if args.extend_path is not None else ""}'
 
+    print('\033[94m', f'Run {name} started', '\033[0m')
     args.audio_path = 'C:/Users/rodri/Datasets/'
     if not hp.linear_model and hp.n_frames % 8 != 0:
         raise argparse.ArgumentTypeError("Due to the three MaxPool layers, n_frames must be a multiple of 8")
 
-    train(args.audio_path, hp)
+    train(args.audio_path, hp, args.extend_path)
