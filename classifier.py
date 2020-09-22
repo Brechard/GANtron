@@ -203,7 +203,7 @@ def load_npy_mels(filepaths_lists, hparams, file_format='.wav'):
     new_filepaths_lists = []
     for n, filepath in enumerate(filepaths_lists):
         progress_bar = tqdm(filepath)
-        progress_bar.set_description(f'Loading file {n}/{len(filepaths_lists)}')
+        progress_bar.set_description(f'Loading file {n + 1}/{len(filepaths_lists)}')
         new_filepaths_list = []
         a = 0
         for path in progress_bar:
@@ -226,17 +226,18 @@ def load_mel(path, hparams, new_path):
     np.save(new_path, melspec)
 
 
-def load_files(files, audio_path, use_labels):
+def load_files(files, audio_path, use_labels, vesus_only):
     filepaths, _, emotions = load_vesus(files[0], audio_path + '/VESUS/Audio/',
                                         use_labels=use_labels, use_text=False)
-    cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
-                                                 use_labels=use_labels, crema=True)
-    filepaths.extend(cremad_file)
-    emotions.extend(cremad_em)
-    ravdess_file, ravdess_em = load_cremad_ravdess(files[2], audio_path + '/RAVDESS/Speech/',
-                                                   use_labels=use_labels, crema=False)
-    filepaths.extend(ravdess_file)
-    emotions.extend(ravdess_em)
+    if not vesus_only:
+        cremad_file, cremad_em = load_cremad_ravdess(files[1], audio_path + '/Crema-D/AudioWAV/',
+                                                     use_labels=use_labels, crema=True)
+        filepaths.extend(cremad_file)
+        emotions.extend(cremad_em)
+        ravdess_file, ravdess_em = load_cremad_ravdess(files[2], audio_path + '/RAVDESS/Speech/',
+                                                       use_labels=use_labels, crema=False)
+        filepaths.extend(ravdess_file)
+        emotions.extend(ravdess_em)
     return filepaths, emotions
 
 
@@ -250,11 +251,11 @@ def load_extension(extend_path, use_labels, train_filepaths, train_emotions):
         train_emotions.append(label)
 
 
-def prepare_data(audio_path, hparams, extend_path):
+def prepare_data(audio_path, hparams, extend_path, vesus_only):
     max_noise, mel_offset, bs = hparams.max_noise, hparams.mel_offset, hparams.batch_size
-    train_filepaths, train_emotions = load_files(hparams.training_files, audio_path, hparams.use_labels)
-    val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels)
-    test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels)
+    train_filepaths, train_emotions = load_files(hparams.training_files, audio_path, hparams.use_labels, vesus_only)
+    val_filepaths, val_emotions = load_files(hparams.validation_files, audio_path, hparams.use_labels, vesus_only)
+    test_filepaths, test_emotions = load_files(hparams.test_files, audio_path, hparams.use_labels, vesus_only)
     if extend_path is not None:
         load_extension(extend_path, hparams.use_labels, train_filepaths, train_emotions)
 
@@ -273,8 +274,8 @@ def prepare_data(audio_path, hparams, extend_path):
     return train_loader, val_loader, test_loader
 
 
-def train(audio_path, hparams, extend_path):
-    train_loader, val_loader, test_loader = prepare_data(audio_path, hparams, extend_path)
+def train(audio_path, hparams, extend_path, vesus_only):
+    train_loader, val_loader, test_loader = prepare_data(audio_path, hparams, extend_path, vesus_only)
 
     model = Classifier(hparams.__dict__)
 
@@ -299,6 +300,7 @@ if __name__ == '__main__':
                                                                       "\'intended\' (what actor was supposed to do) or"
                                                                       "\'multi\' (result of calculated emotions)")
     parser.add_argument('--linear_model', type=str2bool, default=True, help='Use linear model or convolutional')
+    parser.add_argument('--vesus_only', type=str2bool, default=False, help='Use only VESUS dataset')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train')
     parser.add_argument('--batch_size', type=int, default=64,
                         help='Batch size, recommended to use a small one even if it is smaller.')
@@ -318,7 +320,8 @@ if __name__ == '__main__':
     if args.hparams is not None:
         hp.add_params(args.hparams)
 
-    name = f'v{hp.model_version}-{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
+    name = f'v{hp.model_version}-{"VESUSonly" if args.vesus_only else "3DS"}-' \
+           f'{hp.batch_size}bs-{hp.n_frames}nFrames-{hp.lr}LR' \
            f'-{hp.model_size}{"linear" if hp.linear_model else "conv"}' \
            f'-{hp.use_labels}{("-ext_" + args.extend_path.split("/")[-3]) if args.extend_path is not None else ""}' \
            f'{"-fp16" if args.precision == 16 else ""}'
@@ -328,4 +331,4 @@ if __name__ == '__main__':
     if not hp.linear_model and hp.n_frames % 8 != 0:
         raise argparse.ArgumentTypeError("Due to the three MaxPool layers, n_frames must be a multiple of 8")
 
-    train(args.audio_path, hp, args.extend_path)
+    train(args.audio_path, hp, args.extend_path, args.vesus_only)
