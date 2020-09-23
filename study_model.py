@@ -143,10 +143,12 @@ def study_model(output_path, hparams, text, predefined, force_emotions):
     max_decoder_steps_reached = inference_samples(output_path, hparams, text)
     files_paths, sampled = compute_wav(output_path, hparams)
     files_paths = load_npy_mels([files_paths], hparams)
-    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, predefined, force_emotions, max_decoder_steps_reached)
+    train_classifier(output_path, files_paths[0], hparams.n_groups, hparams.notes, sampled, predefined, force_emotions,
+                     max_decoder_steps_reached)
 
 
-def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False, max_decoder_steps_reached=None):
+def train_classifier(output_path, files_paths, n_groups, notes, sampled=None, predefined=False, force_emotions=False,
+                     max_decoder_steps_reached=None):
     hparams_classifier = HPC()
     hparams_classifier.n_emotions = n_groups
     classifier = Classifier(hparams_classifier)
@@ -217,7 +219,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     os.makedirs(args.output_path, exist_ok=True)
-    for folder in ['GANtronInference', 'WaveGlowInference', 'ClassifierOutput']:
+    for folder in ['GANtronInference', 'WaveGlowInference']:
         os.makedirs(f'{args.output_path}/{folder}', exist_ok=True)
 
     hp = HParams()

@@ -1,69 +1,60 @@
-# Tacotron 2 (without wavenet)
+# GANtron (without wavenet)
 
-PyTorch implementation of [Natural TTS Synthesis By Conditioning
-Wavenet On Mel Spectrogram Predictions](https://arxiv.org/pdf/1712.05884.pdf). 
+PyTorch implementation of GANtron: Emotional Speech Synthesis with Generative Adversarial Networks.
+Model based on [Tacotron 2](https://github.com/NVIDIA/tacotron2) 
+Natural TTS Synthesis By Conditioning Wavenet On Mel Spectrogram Predictions.
 
-This implementation includes **distributed** and **automatic mixed precision** support
-and uses the [LJSpeech dataset](https://keithito.com/LJ-Speech-Dataset/).
-
-Distributed and Automatic Mixed Precision support relies on NVIDIA's [Apex] and [AMP].
-
-Visit our [website] for audio samples using our published [Tacotron 2] and
-[WaveGlow] models.
-
-![Alignment, Predicted Mel Spectrogram, Target Mel Spectrogram](tensorboard.png)
+This implementation uses the [LJSpeech dataset](https://keithito.com/LJ-Speech-Dataset/) 
+and the [VESUS dataset](https://engineering.jhu.edu/nsa/vesus/). 
+You may also need the [CREMA-D dataset](https://github.com/CheyneyComputerScience/CREMA-D) 
+and the [RAVDESS dataset](https://zenodo.org/record/1188976).
 
 
 ## Pre-requisites
 1. NVIDIA GPU + CUDA cuDNN
 
 ## Setup
-1. Download and extract the [LJ Speech dataset](https://keithito.com/LJ-Speech-Dataset/)
-2. Clone this repo: `git clone https://github.com/NVIDIA/tacotron2.git`
-3. CD into this repo: `cd tacotron2`
+1. Download and extract the [LJ Speech dataset](https://keithito.com/LJ-Speech-Dataset/) and the [VESUS dataset](https://engineering.jhu.edu/nsa/vesus/).
+2. Clone this repo: `git clone https://github.com/Brechard/GANtron`
+3. CD into this repo: `cd GANtron`
 4. Initialize submodule: `git submodule init; git submodule update`
-5. Update .wav paths: `sed -i -- 's,C:/Users/rodri/Datasets/LJSpeech-1.1/wavs,ljs_dataset_folder/wavs,g' filelists/*.txt`
-    - Alternatively, set `load_mel_from_disk=True` in `hparams.py` and update mel-spectrogram paths 
-6. Install [PyTorch 1.0]
-7. Install [Apex]
-8. Install python requirements or build docker image 
+5. Install PyTorch
+6. Install python requirements or build docker image 
     - Install python requirements: `pip install -r requirements.txt`
+7. (optional) Download [WaveGlow](https://drive.google.com/open?id=1rpK8CzAAirq9sWZhe9nlfvxMF1dRgFbF) model
 
 ## Training
-1. `python train.py --output_directory=outdir --log_directory=logdir`
-2. (OPTIONAL) `tensorboard --logdir=outdir/logdir`
+Every configuration training has this line in common:
+`python train.py --output_directory=outdir --wavs_path=path_to_LJ_dataset --waveglow_path=waveglow_path`
+The extra parameters for the 4 different configurations are:
+1. Vanilla GANtron: `--hparams use_labels=False,use_noise=True`
+2. Using VESUS with Noise: `--hparams use_labels=False,use_noise=True --vesus_path=vesus_path`
+3. Using VESUS, only labels: `--hparams use_labels=True,use_noise=False --vesus_path=vesus_path`
+4. Combining the models: `--hparams use_labels=True,use_noise=True --vesus_path=vesus_path`
+
+## Studying each trained model
+Several flags are provided in case we want to force the noise, the labels, 
+use predefined labels instead of random for each group and using INT values 
+for the values in the labels. Set those according to your needs.
+
+`python study_models.py --gantron_path=path_to_ckpt --waveglow_path=waveglow_path --output_path=output_dir ----hparams specific_hparams_from_model`
+
 
 ## Training using a pre-trained model
 Training using a pre-trained model can lead to faster convergence  
-By default, the dataset dependent text embedding layers are [ignored]
-
-1. Download our published [Tacotron 2] model
-2. `python train.py --output_directory=outdir --log_directory=logdir -c tacotron2_statedict.pt --warm_start`
-
-## Multi-GPU (distributed) and Automatic Mixed Precision Training
-1. `python -m multiproc train.py --output_directory=outdir --log_directory=logdir --hparams=distributed_run=True,fp16_run=True`
-
-## Inference demo
-1. Download our published [Tacotron 2] model
-2. Download our published [WaveGlow] model
-3. `jupyter notebook --ip=127.0.0.1 --port=31337`
-4. Load inference.ipynb 
-
-N.b.  When performing Mel-Spectrogram to Audio synthesis, make sure Tacotron 2
-and the Mel decoder were trained on the same mel-spectrogram representation. 
-
+By default, the dataset dependent text embedding layers are ignored.
 
 ## Related repos
-[WaveGlow](https://github.com/NVIDIA/WaveGlow) Faster than real time Flow-based
-Generative Network for Speech Synthesis
+[Tacotron 2](https://github.com/NVIDIA/tacotron2) Natural TTS Synthesis By Conditioning Wavenet On Mel Spectrogram Predictions
 
-[nv-wavenet](https://github.com/NVIDIA/nv-wavenet/) Faster than real time
-WaveNet.
+[WaveGlow](https://github.com/NVIDIA/WaveGlow) Faster than real time Flow-based Generative Network for Speech Synthesis
+
+[nv-wavenet](https://github.com/NVIDIA/nv-wavenet/) Faster than real time WaveNet.
 
 ## Acknowledgements
 This implementation uses code from the following repos: [Keith
 Ito](https://github.com/keithito/tacotron/), [Prem
-Seetharaman](https://github.com/pseeth/pytorch-stft) as described in our code.
+Seetharaman](https://github.com/pseeth/pytorch-stft), [Rafael Valle](https://github.com/NVIDIA/tacotron2) as described in our code.
 
 We are inspired by [Ryuchi Yamamoto's](https://github.com/r9y9/tacotron_pytorch)
 Tacotron PyTorch implementation.
@@ -73,9 +64,5 @@ Wang and Zongheng Yang.
 
 
 [WaveGlow]: https://drive.google.com/open?id=1rpK8CzAAirq9sWZhe9nlfvxMF1dRgFbF
-[Tacotron 2]: https://drive.google.com/file/d/1c5ZTuT7J08wLUoVZ2KkUs_VdZuJ86ZqA/view?usp=sharing
-[pytorch 1.0]: https://github.com/pytorch/pytorch#installation
-[website]: https://nv-adlr.github.io/WaveGlow
-[ignored]: https://github.com/NVIDIA/tacotron2/blob/master/hparams.py#L22
 [Apex]: https://github.com/nvidia/apex
 [AMP]: https://github.com/NVIDIA/apex/tree/master/apex/amp

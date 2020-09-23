@@ -12,8 +12,6 @@ from text import text_to_sequence
 from utils import to_gpu, get_mask_from_lengths
 
 
-
-
 class LocationLayer(nn.Module):
     def __init__(self, attention_n_filters, attention_kernel_size,
                  attention_dim):
@@ -280,7 +278,6 @@ class Decoder(nn.Module):
             x = torch.cat([x, noise], dim=-1)
         return x
 
-
     def get_go_frame(self, memory):
         """ Gets all zeros frames to use as first decoder input
         PARAMS
@@ -544,8 +541,6 @@ class Discriminator(nn.Module):
 
 
 class LinearDiscriminator(nn.Module):
-    # Patch Discriminator (check the pix2pix git)
-
     def __init__(self, hparams):
         super(LinearDiscriminator, self).__init__()
         self.discriminator = torch.nn.Sequential(
